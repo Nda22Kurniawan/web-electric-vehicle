@@ -1,0 +1,287 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Appointment;
+use App\Models\Vehicle;
+use App\Models\ServiceSchedule;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
+use Carbon\Carbon;
+
+class AppointmentController extends Controller
+{
+    /**
+     * Display a listing of the appointments.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function index()
+    {
+        $appointments = Appointment::with('vehicle')
+            ->latest()
+            ->paginate(10);
+        return view('appointments.index', compact('appointments'));
+    }
+
+    /**
+     * Show the form for creating a new appointment.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function create()
+    {
+        $vehicles = Vehicle::all();
+        $schedules = ServiceSchedule::where('is_closed', false)
+            ->orderBy('day_of_week')
+            ->get();
+        
+        return view('appointments.create', compact('vehicles', 'schedules'));
+    }
+
+    /**
+     * Store a newly created appointment in storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function store(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'customer_name' => 'required|string|max:255',
+            'customer_phone' => 'required|string|max:15',
+            'customer_email' => 'nullable|email|max:255',
+            'vehicle_id' => 'required|exists:vehicles,id',
+            'appointment_date' => 'required|date|after_or_equal:today',
+            'appointment_time' => 'required|date_format:H:i',
+            'service_description' => 'required|string',
+            'notes' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()
+                ->withErrors($validator)
+                ->withInput();
+        }
+
+        // Validate appointment against service schedule
+        $appointmentDate = Carbon::parse($request->appointment_date);
+        $dayOfWeek = $appointmentDate->dayOfWeek;
+        
+        $schedule = ServiceSchedule::where('day_of_week', $dayOfWeek)->first();
+        
+        if (!$schedule || $schedule->is_closed) {
+            return redirect()->back()
+                ->withErrors(['appointment_date' => 'Kami tidak menerima janji pada hari ini.'])
+                ->withInput();
+        }
+        
+        $appointmentTime = Carbon::createFromFormat('H:i', $request->appointment_time);
+        $openTime = Carbon::createFromFormat('H:i', $schedule->open_time->format('H:i'));
+        $closeTime = Carbon::createFromFormat('H:i', $schedule->close_time->format('H:i'));
+        
+        if ($appointmentTime->lt($openTime) || $appointmentTime->gt($closeTime)) {
+            return redirect()->back()
+                ->withErrors(['appointment_time' => 'Waktu janji di luar jam operasional.'])
+                ->withInput();
+        }
+        
+        // Check if max appointments for the day has been reached
+        $appointmentsCount = Appointment::whereDate('appointment_date', $appointmentDate)
+            ->whereIn('status', ['pending', 'confirmed', 'in_progress'])
+            ->count();
+            
+        if ($appointmentsCount >= $schedule->max_appointments) {
+            return redirect()->back()
+                ->withErrors(['appointment_date' => 'Kuota janji untuk tanggal ini sudah penuh.'])
+                ->withInput();
+        }
+
+        $appointment = Appointment::create([
+            'customer_name' => $request->customer_name,
+            'customer_phone' => $request->customer_phone,
+            'customer_email' => $request->customer_email,
+            'vehicle_id' => $request->vehicle_id,
+            'appointment_date' => $request->appointment_date,
+            'appointment_time' => $request->appointment_time,
+            'service_description' => $request->service_description,
+            'status' => 'pending',
+            'notes' => $request->notes,
+        ]);
+
+        return redirect()->route('appointments.show', $appointment)
+            ->with('success', 'Janji service berhasil dibuat. Kode pelacakan: ' . $appointment->tracking_code);
+    }
+
+    /**
+     * Display the specified appointment.
+     *
+     * @param  \App\Models\Appointment  $appointment
+     * @return \Illuminate\Http\Response
+     */
+    public function show(Appointment $appointment)
+    {
+        $appointment->load('vehicle');
+        return view('appointments.show', compact('appointment'));
+    }
+
+    /**
+     * Show the form for editing the specified appointment.
+     *
+     * @param  \App\Models\Appointment  $appointment
+     * @return \Illuminate\Http\Response
+     */
+    public function edit(Appointment $appointment)
+    {
+        $vehicles = Vehicle::all();
+        $schedules = ServiceSchedule::where('is_closed', false)
+            ->orderBy('day_of_week')
+            ->get();
+            
+        return view('appointments.edit', compact('appointment', 'vehicles', 'schedules'));
+    }
+
+    /**
+     * Update the specified appointment in storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \App\Models\Appointment  $appointment
+     * @return \Illuminate\Http\Response
+     */
+    public function update(Request $request, Appointment $appointment)
+    {
+        $validator = Validator::make($request->all(), [
+            'customer_name' => 'required|string|max:255',
+            'customer_phone' => 'required|string|max:15',
+            'customer_email' => 'nullable|email|max:255',
+            'vehicle_id' => 'required|exists:vehicles,id',
+            'appointment_date' => 'required|date|after_or_equal:today',
+            'appointment_time' => 'required|date_format:H:i',
+            'service_description' => 'required|string',
+            'status' => 'required|in:pending,confirmed,in_progress,completed,cancelled',
+            'notes' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()
+                ->withErrors($validator)
+                ->withInput();
+        }
+
+        // Additional validations only if changing the date/time
+        if ($request->appointment_date != $appointment->appointment_date->format('Y-m-d') || 
+            $request->appointment_time != $appointment->appointment_time->format('H:i')) {
+                
+            // Validate appointment against service schedule
+            $appointmentDate = Carbon::parse($request->appointment_date);
+            $dayOfWeek = $appointmentDate->dayOfWeek;
+            
+            $schedule = ServiceSchedule::where('day_of_week', $dayOfWeek)->first();
+            
+            if (!$schedule || $schedule->is_closed) {
+                return redirect()->back()
+                    ->withErrors(['appointment_date' => 'Kami tidak menerima janji pada hari ini.'])
+                    ->withInput();
+            }
+            
+            $appointmentTime = Carbon::createFromFormat('H:i', $request->appointment_time);
+            $openTime = Carbon::createFromFormat('H:i', $schedule->open_time->format('H:i'));
+            $closeTime = Carbon::createFromFormat('H:i', $schedule->close_time->format('H:i'));
+            
+            if ($appointmentTime->lt($openTime) || $appointmentTime->gt($closeTime)) {
+                return redirect()->back()
+                    ->withErrors(['appointment_time' => 'Waktu janji di luar jam operasional.'])
+                    ->withInput();
+            }
+            
+            // Check if max appointments for the day has been reached (excluding this appointment)
+            $appointmentsCount = Appointment::whereDate('appointment_date', $appointmentDate)
+                ->whereIn('status', ['pending', 'confirmed', 'in_progress'])
+                ->where('id', '!=', $appointment->id)
+                ->count();
+                
+            if ($appointmentsCount >= $schedule->max_appointments) {
+                return redirect()->back()
+                    ->withErrors(['appointment_date' => 'Kuota janji untuk tanggal ini sudah penuh.'])
+                    ->withInput();
+            }
+        }
+
+        $appointment->update([
+            'customer_name' => $request->customer_name,
+            'customer_phone' => $request->customer_phone,
+            'customer_email' => $request->customer_email,
+            'vehicle_id' => $request->vehicle_id,
+            'appointment_date' => $request->appointment_date,
+            'appointment_time' => $request->appointment_time,
+            'service_description' => $request->service_description,
+            'status' => $request->status,
+            'notes' => $request->notes,
+        ]);
+
+        return redirect()->route('appointments.show', $appointment)
+            ->with('success', 'Janji service berhasil diperbarui.');
+    }
+
+    /**
+     * Remove the specified appointment from storage.
+     *
+     * @param  \App\Models\Appointment  $appointment
+     * @return \Illuminate\Http\Response
+     */
+    public function destroy(Appointment $appointment)
+    {
+        $appointment->delete();
+
+        return redirect()->route('appointments.index')
+            ->with('success', 'Janji service berhasil dihapus.');
+    }
+
+    /**
+     * Display appointments for today.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function today()
+    {
+        $appointments = Appointment::with('vehicle')
+            ->today()
+            ->latest()
+            ->get();
+            
+        return view('appointments.today', compact('appointments'));
+    }
+    
+    /**
+     * Track appointment by tracking code.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function track(Request $request)
+    {
+        if ($request->isMethod('post')) {
+            $validator = Validator::make($request->all(), [
+                'tracking_code' => 'required|string|max:20',
+            ]);
+    
+            if ($validator->fails()) {
+                return redirect()->back()
+                    ->withErrors($validator)
+                    ->withInput();
+            }
+            
+            $appointment = Appointment::where('tracking_code', $request->tracking_code)->first();
+            
+            if (!$appointment) {
+                return redirect()->back()
+                    ->withErrors(['tracking_code' => 'Kode pelacakan tidak valid.'])
+                    ->withInput();
+            }
+            
+            return view('appointments.track-result', compact('appointment'));
+        }
+        
+        return view('appointments.track');
+    }
+}
