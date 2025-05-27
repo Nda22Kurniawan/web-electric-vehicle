@@ -46,7 +46,7 @@ class PartController extends Controller
             'cost' => 'required|numeric|min:0',
             'stock' => 'required|integer|min:0',
             'min_stock' => 'required|integer|min:0',
-            'vehicle_type' => 'required|in:motorcycle,electric_bike,both',
+            'vehicle_type' => 'required|in:motor,sepeda,keduanya',
         ]);
 
         if ($validator->fails()) {

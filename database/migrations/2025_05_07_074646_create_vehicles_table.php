@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->string('customer_name');
             $table->string('customer_phone', 15);
-            $table->enum('type', ['motor', 'sepeda']);
+            $table->enum('type', ['motorcycle', 'electric_bike']);
             $table->string('brand', 100);
             $table->string('model', 100);
             $table->year('year');
