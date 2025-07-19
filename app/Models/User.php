@@ -45,9 +45,7 @@ class User extends Authenticatable
     ];
 
     /**
-     * Determine if the user is an admin.
-     *
-     * @return bool
+     * Check if user is admin
      */
     public function isAdmin()
     {
@@ -55,12 +53,58 @@ class User extends Authenticatable
     }
 
     /**
-     * Determine if the user is a mechanic.
-     *
-     * @return bool
+     * Check if user is mechanic
      */
     public function isMechanic()
     {
         return $this->role === 'mechanic';
+    }
+
+    /**
+     * Check if user is customer
+     */
+    public function isCustomer()
+    {
+        return $this->role === 'customer';
+    }
+
+    /**
+     * Get the vehicles owned by the customer.
+     */
+    public function vehicles()
+    {
+        return $this->hasMany(Vehicle::class, 'customer_id');
+    }
+
+    /**
+     * Get the appointments made by the customer.
+     */
+    public function appointments()
+    {
+        return $this->hasMany(Appointment::class, 'customer_id');
+    }
+
+    /**
+     * Get the work orders for the customer.
+     */
+    public function workOrders()
+    {
+        return $this->hasMany(WorkOrder::class, 'customer_id');
+    }
+
+    /**
+     * Get the work orders assigned to the mechanic.
+     */
+    public function mechanicWorkOrders()
+    {
+        return $this->hasMany(WorkOrder::class, 'mechanic_id');
+    }
+
+    /**
+     * Get the feedback given by the customer.
+     */
+    public function feedback()
+    {
+        return $this->hasMany(CustomerFeedback::class, 'customer_id');
     }
 }

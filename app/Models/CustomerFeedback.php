@@ -16,7 +16,8 @@ class CustomerFeedback extends Model
      */
     protected $fillable = [
         'work_order_id',
-        'customer_name',
+        'customer_id',
+        'customer_name', // nullable untuk backward compatibility
         'rating',
         'comment',
         'is_public',
@@ -31,6 +32,14 @@ class CustomerFeedback extends Model
         'rating' => 'integer',
         'is_public' => 'boolean',
     ];
+
+    /**
+     * Get the customer that gave the feedback.
+     */
+    public function customer()
+    {
+        return $this->belongsTo(User::class, 'customer_id');
+    }
 
     /**
      * Get the work order associated with the feedback.
@@ -89,5 +98,13 @@ class CustomerFeedback extends Model
         ];
         
         return $ratings[$this->rating] ?? 'Tidak Ada Rating';
+    }
+
+    /**
+     * Get customer name (from relationship or fallback to stored value)
+     */
+    public function getCustomerNameAttribute()
+    {
+        return $this->customer ? $this->customer->name : $this->attributes['customer_name'];
     }
 }

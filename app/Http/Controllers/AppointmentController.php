@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Appointment;
 use App\Models\Vehicle;
 use App\Models\ServiceSchedule;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
@@ -18,7 +19,7 @@ class AppointmentController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Appointment::with('vehicle');
+        $query = Appointment::with(['vehicle', 'customer']);
 
         // Apply filters
         if ($request->filled('status')) {
@@ -58,7 +59,7 @@ class AppointmentController extends Controller
             ->count();
 
         // Get recent appointments for the dashboard section
-        $recent_appointments = Appointment::with('vehicle')
+        $recent_appointments = Appointment::with(['vehicle', 'customer'])
             ->latest()
             ->limit(10)
             ->get();
@@ -81,11 +82,12 @@ class AppointmentController extends Controller
     public function create()
     {
         $vehicles = Vehicle::all();
+        $customers = User::where('role', 'customer')->get(); // Assuming you have a role field
         $schedules = ServiceSchedule::where('is_closed', false)
             ->orderBy('day_of_week')
             ->get();
 
-        return view('appointments.create', compact('vehicles', 'schedules'));
+        return view('appointments.create', compact('vehicles', 'customers', 'schedules'));
     }
 
     /**
@@ -96,16 +98,24 @@ class AppointmentController extends Controller
      */
     public function store(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'customer_name' => 'required|string|max:255',
-            'customer_phone' => 'required|string|max:15',
-            'customer_email' => 'nullable|email|max:255',
+        $validationRules = [
             'vehicle_id' => 'required|exists:vehicles,id',
             'appointment_date' => 'required|date|after_or_equal:today',
             'appointment_time' => 'required|date_format:H:i',
             'service_description' => 'required|string',
             'notes' => 'nullable|string',
-        ]);
+        ];
+
+        // Check if using existing customer or new customer data
+        if ($request->filled('customer_id')) {
+            $validationRules['customer_id'] = 'required|exists:users,id';
+        } else {
+            $validationRules['customer_name'] = 'required|string|max:255';
+            $validationRules['customer_phone'] = 'required|string|max:15';
+            $validationRules['customer_email'] = 'nullable|email|max:255';
+        }
+
+        $validator = Validator::make($request->all(), $validationRules);
 
         if ($validator->fails()) {
             return redirect()->back()
@@ -146,17 +156,26 @@ class AppointmentController extends Controller
                 ->withInput();
         }
 
-        $appointment = Appointment::create([
-            'customer_name' => $request->customer_name,
-            'customer_phone' => $request->customer_phone,
-            'customer_email' => $request->customer_email,
+        // Prepare data for creation
+        $appointmentData = [
             'vehicle_id' => $request->vehicle_id,
             'appointment_date' => $request->appointment_date,
             'appointment_time' => $request->appointment_time,
             'service_description' => $request->service_description,
             'status' => 'pending',
             'notes' => $request->notes,
-        ]);
+        ];
+
+        // Add customer data based on input type
+        if ($request->filled('customer_id')) {
+            $appointmentData['customer_id'] = $request->customer_id;
+        } else {
+            $appointmentData['customer_name'] = $request->customer_name;
+            $appointmentData['customer_phone'] = $request->customer_phone;
+            $appointmentData['customer_email'] = $request->customer_email;
+        }
+
+        $appointment = Appointment::create($appointmentData);
 
         return redirect()->route('appointments.show', $appointment)
             ->with('success', 'Janji service berhasil dibuat. Kode pelacakan: ' . $appointment->tracking_code);
@@ -170,7 +189,7 @@ class AppointmentController extends Controller
      */
     public function show(Appointment $appointment)
     {
-        $appointment->load('vehicle');
+        $appointment->load(['vehicle', 'customer']);
         return view('appointments.show', compact('appointment'));
     }
 
@@ -183,11 +202,14 @@ class AppointmentController extends Controller
     public function edit(Appointment $appointment)
     {
         $vehicles = Vehicle::all();
+        $customers = User::where('role', 'customer')->get(); // Assuming you have a role field
         $schedules = ServiceSchedule::where('is_closed', false)
             ->orderBy('day_of_week')
             ->get();
 
-        return view('appointments.edit', compact('appointment', 'vehicles', 'schedules'));
+        $appointment->load(['vehicle', 'customer']);
+
+        return view('appointments.edit', compact('appointment', 'vehicles', 'customers', 'schedules'));
     }
 
     /**
@@ -236,17 +258,25 @@ class AppointmentController extends Controller
         }
 
         // Full update validation (for edit form)
-        $validator = Validator::make($request->all(), [
-            'customer_name' => 'required|string|max:255',
-            'customer_phone' => 'required|string|max:15',
-            'customer_email' => 'nullable|email|max:255',
+        $validationRules = [
             'vehicle_id' => 'required|exists:vehicles,id',
             'appointment_date' => 'required|date|after_or_equal:today',
             'appointment_time' => 'required|date_format:H:i',
             'service_description' => 'required|string',
             'status' => 'required|in:pending,confirmed,in_progress,completed,cancelled',
             'notes' => 'nullable|string',
-        ]);
+        ];
+
+        // Check if using existing customer or updating customer data
+        if ($request->filled('customer_id')) {
+            $validationRules['customer_id'] = 'required|exists:users,id';
+        } else {
+            $validationRules['customer_name'] = 'required|string|max:255';
+            $validationRules['customer_phone'] = 'required|string|max:15';
+            $validationRules['customer_email'] = 'nullable|email|max:255';
+        }
+
+        $validator = Validator::make($request->all(), $validationRules);
 
         if ($validator->fails()) {
             return redirect()->back()
@@ -295,17 +325,31 @@ class AppointmentController extends Controller
             }
         }
 
-        $appointment->update([
-            'customer_name' => $request->customer_name,
-            'customer_phone' => $request->customer_phone,
-            'customer_email' => $request->customer_email,
+        // Prepare update data
+        $updateData = [
             'vehicle_id' => $request->vehicle_id,
             'appointment_date' => $request->appointment_date,
             'appointment_time' => $request->appointment_time,
             'service_description' => $request->service_description,
             'status' => $request->status,
             'notes' => $request->notes,
-        ]);
+        ];
+
+        // Handle customer data update
+        if ($request->filled('customer_id')) {
+            $updateData['customer_id'] = $request->customer_id;
+            // Clear old customer data if switching to registered customer
+            $updateData['customer_name'] = null;
+            $updateData['customer_phone'] = null;
+            $updateData['customer_email'] = null;
+        } else {
+            $updateData['customer_id'] = null;
+            $updateData['customer_name'] = $request->customer_name;
+            $updateData['customer_phone'] = $request->customer_phone;
+            $updateData['customer_email'] = $request->customer_email;
+        }
+
+        $appointment->update($updateData);
 
         return redirect()->route('appointments.show', $appointment)
             ->with('success', 'Janji service berhasil diperbarui.');
@@ -374,7 +418,7 @@ class AppointmentController extends Controller
      */
     public function today()
     {
-        $appointments = Appointment::with('vehicle')
+        $appointments = Appointment::with(['vehicle', 'customer'])
             ->today()
             ->latest()
             ->get();
@@ -401,7 +445,9 @@ class AppointmentController extends Controller
                     ->withInput();
             }
 
-            $appointment = Appointment::where('tracking_code', $request->tracking_code)->first();
+            $appointment = Appointment::with(['vehicle', 'customer'])
+                ->where('tracking_code', $request->tracking_code)
+                ->first();
 
             if (!$appointment) {
                 return redirect()->back()

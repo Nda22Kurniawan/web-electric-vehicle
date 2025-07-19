@@ -26,10 +26,26 @@ class UserFactory extends Factory
         return [
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
+            'phone' => $this->generatePhoneNumber(),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
+            'role' => 'customer', // Default role
             'remember_token' => Str::random(10),
         ];
+    }
+
+    /**
+     * Generate Indonesian phone number format.
+     *
+     * @return string
+     */
+    private function generatePhoneNumber(): string
+    {
+        $prefixes = ['0812', '0813', '0814', '0815', '0816', '0817', '0818', '0819', '0821', '0822', '0823'];
+        $prefix = fake()->randomElement($prefixes);
+        $number = fake()->numerify('########');
+        
+        return $prefix . $number;
     }
 
     /**
@@ -39,6 +55,36 @@ class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
+        ]);
+    }
+
+    /**
+     * Indicate that the user is an admin.
+     */
+    public function admin(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => 'admin',
+        ]);
+    }
+
+    /**
+     * Indicate that the user is a mechanic.
+     */
+    public function mechanic(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => 'mechanic',
+        ]);
+    }
+
+    /**
+     * Indicate that the user is a customer.
+     */
+    public function customer(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => 'customer',
         ]);
     }
 }

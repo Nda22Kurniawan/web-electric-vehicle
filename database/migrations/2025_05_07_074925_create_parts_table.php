@@ -17,7 +17,7 @@ return new class extends Migration
             $table->decimal('cost', 10, 2);
             $table->integer('stock')->default(0);
             $table->integer('min_stock')->default(5);
-            $table->enum('vehicle_type', ['motorcycle', 'electric_bike', 'both'])->default('keduanya');
+            $table->enum('vehicle_type', ['motorcycle', 'electric_bike', 'both'])->default('both');
             $table->timestamps();
         });
     }

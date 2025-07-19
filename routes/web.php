@@ -15,6 +15,7 @@ use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\WorkOrderController;
 use App\Http\Controllers\WorkOrderPartController;
 use App\Http\Controllers\WorkOrderServiceController;
+use App\Http\Controllers\CustomerController;
 
 /*
 |--------------------------------------------------------------------------
@@ -80,6 +81,26 @@ Route::middleware('auth')->group(function () {
         Route::resource('work-orders', WorkOrderController::class);
     });
 
+    // Customer routes
+    Route::middleware('can:customer')->group(function () {
+        Route::get('/customer/dashboard', [CustomerController::class, 'dashboard'])->name('customer.dashboard');
+        
+        // Customer specific routes
+        Route::get('/customer/bookings', [CustomerController::class, 'bookings'])->name('customer.bookings');
+        Route::get('/customer/bookings/create', [CustomerController::class, 'createBooking'])->name('customer.bookings.create');
+        Route::post('/customer/bookings', [CustomerController::class, 'storeBooking'])->name('customer.bookings.store');
+        Route::get('/customer/bookings/history', [CustomerController::class, 'bookingHistory'])->name('customer.bookings.history');
+        
+        Route::get('/customer/vehicles', [CustomerController::class, 'vehicles'])->name('customer.vehicles');
+        Route::get('/customer/vehicles/create', [CustomerController::class, 'createVehicle'])->name('customer.vehicles.create');
+        Route::post('/customer/vehicles', [CustomerController::class, 'storeVehicle'])->name('customer.vehicles.store');
+        Route::get('/customer/vehicles/{vehicle}/edit', [CustomerController::class, 'editVehicle'])->name('customer.vehicles.edit');
+        Route::put('/customer/vehicles/{vehicle}', [CustomerController::class, 'updateVehicle'])->name('customer.vehicles.update');
+        
+        Route::get('/customer/profile', [CustomerController::class, 'profile'])->name('customer.profile');
+        Route::put('/customer/profile', [CustomerController::class, 'updateProfile'])->name('customer.profile.update');
+    });
+
     // Common routes for all authenticated users
     // Appointments with custom routes
     Route::get('/appointments/today', [AppointmentController::class, 'today'])->name('appointments.today');
@@ -119,8 +140,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard', function () {
         if (auth()->user()->isAdmin()) {
             return redirect()->route('admin.dashboard');
-        } else {
+        } elseif (auth()->user()->isMechanic()) {
             return redirect()->route('mechanic.dashboard');
+        } else {
+            return redirect()->route('customer.dashboard');
         }
     })->name('dashboard');
 });

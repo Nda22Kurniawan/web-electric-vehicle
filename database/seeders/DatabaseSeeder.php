@@ -28,9 +28,18 @@ class DatabaseSeeder extends Seeder
             'role' => 'mechanic'
         ]);
 
-        // Anda bisa menambahkan lebih banyak teknisi di sini
-        User::factory()->count(5)->create([
-            'role' => 'mechanic'
+        User::create([
+            'name' => 'Nanda',
+            'email' => 'nanda@gmail.com',
+            'phone' => '0895704340678',
+            'password' => Hash::make('nanda123'),
+            'role' => 'customer'
         ]);
+
+        // Create additional mechanics
+        User::factory()->mechanic()->count(5)->create();
+
+        // Create some customers
+        User::factory()->customer()->count(10)->create();
     }
 }

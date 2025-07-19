@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('customer_feedback', function (Blueprint $table) {
             $table->id();
             $table->foreignId('work_order_id')->constrained();
-            $table->string('customer_name');
+            $table->foreignId('customer_id')->constrained('users')->onDelete('cascade');
             $table->tinyInteger('rating');
             $table->text('comment')->nullable();
             $table->boolean('is_public')->default(false);

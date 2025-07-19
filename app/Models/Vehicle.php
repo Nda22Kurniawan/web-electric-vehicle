@@ -15,8 +15,9 @@ class Vehicle extends Model
      * @var array<int, string>
      */
     protected $fillable = [
-        'customer_name',
-        'customer_phone',
+        'customer_id',
+        'customer_name', // nullable untuk backward compatibility
+        'customer_phone', // nullable untuk backward compatibility
         'type',
         'brand',
         'model',
@@ -25,6 +26,14 @@ class Vehicle extends Model
         'color',
         'notes',
     ];
+
+    /**
+     * Get the customer that owns the vehicle.
+     */
+    public function customer()
+    {
+        return $this->belongsTo(User::class, 'customer_id');
+    }
 
     /**
      * Get the appointments for the vehicle.
@@ -40,5 +49,21 @@ class Vehicle extends Model
     public function workOrders()
     {
         return $this->hasMany(WorkOrder::class);
+    }
+
+    /**
+     * Get customer name (from relationship or fallback to stored value)
+     */
+    public function getCustomerNameAttribute()
+    {
+        return $this->customer ? $this->customer->name : $this->attributes['customer_name'];
+    }
+
+    /**
+     * Get customer phone (from relationship or fallback to stored value)
+     */
+    public function getCustomerPhoneAttribute()
+    {
+        return $this->customer ? $this->customer->phone : $this->attributes['customer_phone'];
     }
 }

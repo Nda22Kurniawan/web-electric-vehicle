@@ -10,9 +10,7 @@ return new class extends Migration
     {
         Schema::create('appointments', function (Blueprint $table) {
             $table->id();
-            $table->string('customer_name');
-            $table->string('customer_phone', 15);
-            $table->string('customer_email')->nullable();
+            $table->foreignId('customer_id')->constrained('users')->onDelete('cascade');
             $table->foreignId('vehicle_id')->constrained();
             $table->date('appointment_date');
             $table->time('appointment_time');

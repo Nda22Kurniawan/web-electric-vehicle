@@ -27,7 +27,7 @@ class WorkOrderController extends Controller
      */
     public function index(Request $request)
     {
-        $query = WorkOrder::with(['vehicle', 'mechanic', 'appointment']);
+        $query = WorkOrder::with(['vehicle', 'mechanic', 'appointment', 'customer']);
 
         // Filter by status if provided
         if ($request->has('status') && $request->status) {
@@ -53,13 +53,18 @@ class WorkOrderController extends Controller
             $query->whereDate('created_at', '<=', $request->end_date);
         }
 
-        // Search by work order number or customer name
+        // Search by work order number or customer name/phone
         if ($request->has('search') && $request->search) {
             $search = $request->search;
             $query->where(function($q) use ($search) {
                 $q->where('work_order_number', 'like', "%{$search}%")
                   ->orWhere('customer_name', 'like', "%{$search}%")
-                  ->orWhere('customer_phone', 'like', "%{$search}%");
+                  ->orWhere('customer_phone', 'like', "%{$search}%")
+                  // Search in customer relationship
+                  ->orWhereHas('customer', function($customerQuery) use ($search) {
+                      $customerQuery->where('name', 'like', "%{$search}%")
+                                   ->orWhere('phone', 'like', "%{$search}%");
+                  });
             });
         }
 
@@ -86,18 +91,24 @@ class WorkOrderController extends Controller
         $appointmentId = $request->query('appointment_id');
         $appointment = null;
         $vehicle = null;
+        $customer = null;
         
         if ($appointmentId) {
-            $appointment = Appointment::findOrFail($appointmentId);
-            $vehicle = Vehicle::findOrFail($appointment->vehicle_id);
+            $appointment = Appointment::with(['vehicle', 'customer'])->findOrFail($appointmentId);
+            $vehicle = $appointment->vehicle;
+            $customer = $appointment->customer;
         }
         
         $vehicles = Vehicle::all();
+        $customers = User::where('role', 'customer')->get();
         $mechanics = User::where('role', 'mechanic')->get();
         $services = Service::all();
         $parts = Part::where('stock', '>', 0)->get();
         
-        return view('work_orders.create', compact('appointment', 'vehicle', 'vehicles', 'mechanics', 'services', 'parts'));
+        return view('work_orders.create', compact(
+            'appointment', 'vehicle', 'customer', 'vehicles', 
+            'customers', 'mechanics', 'services', 'parts'
+        ));
     }
 
     /**
@@ -109,8 +120,9 @@ class WorkOrderController extends Controller
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'customer_name' => 'required|string|max:255',
-            'customer_phone' => 'required|string|max:15',
+            'customer_id' => 'nullable|exists:users,id',
+            'customer_name' => 'required_without:customer_id|string|max:255',
+            'customer_phone' => 'required_without:customer_id|string|max:15',
             'vehicle_id' => 'required|exists:vehicles,id',
             'mechanic_id' => 'required|exists:users,id',
             'appointment_id' => 'nullable|exists:appointments,id',
@@ -134,17 +146,27 @@ class WorkOrderController extends Controller
         DB::beginTransaction();
 
         try {
-            // Create work order
-            $workOrder = WorkOrder::create([
+            // Prepare work order data
+            $workOrderData = [
                 'appointment_id' => $request->appointment_id,
-                'customer_name' => $request->customer_name,
-                'customer_phone' => $request->customer_phone,
                 'vehicle_id' => $request->vehicle_id,
                 'mechanic_id' => $request->mechanic_id,
                 'status' => 'pending',
                 'diagnosis' => $request->diagnosis,
                 'payment_status' => 'unpaid',
-            ]);
+            ];
+
+            // Handle customer data - prioritize customer_id if provided
+            if ($request->customer_id) {
+                $workOrderData['customer_id'] = $request->customer_id;
+            } else {
+                // Store customer name and phone for backward compatibility
+                $workOrderData['customer_name'] = $request->customer_name;
+                $workOrderData['customer_phone'] = $request->customer_phone;
+            }
+
+            // Create work order
+            $workOrder = WorkOrder::create($workOrderData);
 
             // Add services to work order
             if ($request->has('services')) {
@@ -224,12 +246,14 @@ class WorkOrderController extends Controller
     public function show(WorkOrder $workOrder)
     {
         $workOrder->load([
+            'customer',
             'vehicle', 
             'mechanic', 
             'appointment', 
             'services.service', 
             'parts.part', 
-            'payments'
+            'payments',
+            'feedback'
         ]);
         
         return view('work_orders.show', compact('workOrder'));
@@ -243,16 +267,26 @@ class WorkOrderController extends Controller
      */
     public function edit(WorkOrder $workOrder)
     {
-        $workOrder->load(['vehicle', 'mechanic', 'appointment', 'services.service', 'parts.part']);
+        $workOrder->load([
+            'customer',
+            'vehicle', 
+            'mechanic', 
+            'appointment', 
+            'services.service', 
+            'parts.part'
+        ]);
         
         $vehicles = Vehicle::all();
+        $customers = User::where('role', 'customer')->get();
         $mechanics = User::where('role', 'mechanic')->get();
         $services = Service::all();
         $parts = Part::where('stock', '>', 0)
             ->orWhereIn('id', $workOrder->parts->pluck('part_id'))
             ->get();
         
-        return view('work_orders.edit', compact('workOrder', 'vehicles', 'mechanics', 'services', 'parts'));
+        return view('work_orders.edit', compact(
+            'workOrder', 'vehicles', 'customers', 'mechanics', 'services', 'parts'
+        ));
     }
 
     /**
@@ -265,8 +299,9 @@ class WorkOrderController extends Controller
     public function update(Request $request, WorkOrder $workOrder)
     {
         $validator = Validator::make($request->all(), [
-            'customer_name' => 'required|string|max:255',
-            'customer_phone' => 'required|string|max:15',
+            'customer_id' => 'nullable|exists:users,id',
+            'customer_name' => 'required_without:customer_id|string|max:255',
+            'customer_phone' => 'required_without:customer_id|string|max:15',
             'mechanic_id' => 'required|exists:users,id',
             'diagnosis' => 'nullable|string',
             'status' => 'required|in:pending,in_progress,completed,cancelled',
@@ -289,14 +324,26 @@ class WorkOrderController extends Controller
         DB::beginTransaction();
 
         try {
-            // Update work order details
-            $workOrder->update([
-                'customer_name' => $request->customer_name,
-                'customer_phone' => $request->customer_phone,
+            // Prepare update data
+            $updateData = [
                 'mechanic_id' => $request->mechanic_id,
                 'diagnosis' => $request->diagnosis,
                 'status' => $request->status,
-            ]);
+            ];
+
+            // Handle customer data
+            if ($request->customer_id) {
+                $updateData['customer_id'] = $request->customer_id;
+                $updateData['customer_name'] = null; // Clear fallback data
+                $updateData['customer_phone'] = null; // Clear fallback data
+            } else {
+                $updateData['customer_id'] = null;
+                $updateData['customer_name'] = $request->customer_name;
+                $updateData['customer_phone'] = $request->customer_phone;
+            }
+
+            // Update work order details
+            $workOrder->update($updateData);
 
             // Handle start and end times based on status
             $oldStatus = $workOrder->getOriginal('status');
@@ -322,7 +369,6 @@ class WorkOrderController extends Controller
             $workOrder->save();
 
             // Update services
-            // First, get existing services to track what's been removed
             $existingServices = $workOrder->services->pluck('id', 'id')->toArray();
             
             if ($request->has('services')) {
@@ -357,8 +403,7 @@ class WorkOrderController extends Controller
                 WorkOrderService::whereIn('id', array_keys($existingServices))->delete();
             }
 
-            // Update parts
-            // First, get existing parts to track what's been removed or modified
+            // Update parts with proper inventory handling
             $existingParts = $workOrder->parts->keyBy('id')->toArray();
             $updatedParts = [];
             
@@ -389,7 +434,7 @@ class WorkOrderController extends Controller
                                 InventoryTransaction::create([
                                     'part_id' => $partData['part_id'],
                                     'work_order_id' => $workOrder->id,
-                                    'quantity' => -1 * $quantityDiff, // Negative for usage
+                                    'quantity' => -1 * $quantityDiff,
                                     'transaction_type' => $quantityDiff > 0 ? 'sales' : 'return',
                                     'notes' => "Adjusted in Work Order #{$workOrder->work_order_number}",
                                 ]);
@@ -425,7 +470,7 @@ class WorkOrderController extends Controller
                         InventoryTransaction::create([
                             'part_id' => $partData['part_id'],
                             'work_order_id' => $workOrder->id,
-                            'quantity' => -1 * $partData['quantity'], // Negative for sales
+                            'quantity' => -1 * $partData['quantity'],
                             'transaction_type' => 'sales',
                             'notes' => "Added to Work Order #{$workOrder->work_order_number}",
                         ]);
@@ -447,7 +492,7 @@ class WorkOrderController extends Controller
                     InventoryTransaction::create([
                         'part_id' => $existingPart->part_id,
                         'work_order_id' => $workOrder->id,
-                        'quantity' => $existingPart->quantity, // Positive for return
+                        'quantity' => $existingPart->quantity,
                         'transaction_type' => 'return',
                         'notes' => "Removed from Work Order #{$workOrder->work_order_number}",
                     ]);
@@ -457,7 +502,7 @@ class WorkOrderController extends Controller
                 }
             }
 
-            // Calculate and update total
+            // Calculate and update total using the model method
             $workOrder->updateTotal();
 
             DB::commit();
@@ -499,7 +544,7 @@ class WorkOrderController extends Controller
                 InventoryTransaction::create([
                     'part_id' => $workOrderPart->part_id,
                     'work_order_id' => null,
-                    'quantity' => $workOrderPart->quantity, // Positive for return
+                    'quantity' => $workOrderPart->quantity,
                     'transaction_type' => 'return',
                     'notes' => "Returned from deleted Work Order #{$workOrder->work_order_number}",
                 ]);
@@ -579,7 +624,7 @@ class WorkOrderController extends Controller
                     InventoryTransaction::create([
                         'part_id' => $workOrderPart->part_id,
                         'work_order_id' => $workOrder->id,
-                        'quantity' => $workOrderPart->quantity, // Positive for return
+                        'quantity' => $workOrderPart->quantity,
                         'transaction_type' => 'return',
                         'notes' => "Returned from cancelled Work Order #{$workOrder->work_order_number}",
                     ]);
@@ -640,13 +685,13 @@ class WorkOrderController extends Controller
             'notes' => 'nullable|string',
         ]);
 
-        // Ensure payment doesn't exceed remaining balance
+        // Use the model's remaining balance accessor
         $remainingBalance = $workOrder->remaining_balance;
         $paymentAmount = $request->amount;
         
         if ($paymentAmount > $remainingBalance) {
             return redirect()->back()
-                ->with('error', "Payment amount exceeds the remaining balance of {$remainingBalance}")
+                ->with('error', "Payment amount exceeds the remaining balance of " . number_format($remainingBalance, 2))
                 ->withInput();
         }
 
@@ -660,7 +705,7 @@ class WorkOrderController extends Controller
             'notes' => $request->notes,
         ]);
 
-        // Update work order payment status
+        // Update work order payment status using model method
         $workOrder->updatePaymentStatus();
 
         return redirect()->route('work-orders.show', $workOrder->id)
@@ -676,6 +721,7 @@ class WorkOrderController extends Controller
     public function invoice(WorkOrder $workOrder)
     {
         $workOrder->load([
+            'customer',
             'vehicle', 
             'mechanic', 
             'services.service', 
@@ -695,6 +741,7 @@ class WorkOrderController extends Controller
     public function receipt(WorkOrder $workOrder)
     {
         $workOrder->load([
+            'customer',
             'vehicle', 
             'mechanic', 
             'services.service', 
@@ -715,6 +762,7 @@ class WorkOrderController extends Controller
     {
         $workOrder = WorkOrder::where('work_order_number', $workOrderNumber)
             ->where('status', 'completed')
+            ->with(['feedback'])
             ->firstOrFail();
         
         // Check if feedback already exists
@@ -745,7 +793,7 @@ class WorkOrderController extends Controller
             'is_public' => 'boolean',
         ]);
         
-        // Create feedback
+        // Create feedback using the relationship
         $feedback = $workOrder->feedback()->create([
             'customer_name' => $request->customer_name,
             'rating' => $request->rating,

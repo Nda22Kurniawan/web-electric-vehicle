@@ -40,11 +40,17 @@ class AuthController extends Controller
 
             // Redirect based on user role
             $user = Auth::user();
-            if ($user->isAdmin()) {
-                return redirect()->intended(route('admin.dashboard'));
-            } else {
-                return redirect()->intended(route('mechanic.dashboard'));
+            
+            // Validate user role
+            if (!in_array($user->role, ['admin', 'mechanic', 'customer'])) {
+                Auth::logout();
+                throw ValidationException::withMessages([
+                    'email' => ['Your account does not have a valid role.'],
+                ]);
             }
+
+            // Redirect to appropriate dashboard
+            return redirect()->intended($this->getDashboardRoute());
         }
 
         // Authentication failed
@@ -67,5 +73,26 @@ class AuthController extends Controller
         $request->session()->regenerateToken();
 
         return redirect('/');
+    }
+
+    /**
+     * Get dashboard route based on user role.
+     *
+     * @return string
+     */
+    protected function getDashboardRoute()
+    {
+        $user = Auth::user();
+        
+        if ($user->isAdmin()) {
+            return route('admin.dashboard');
+        } elseif ($user->isMechanic()) {
+            return route('mechanic.dashboard');
+        } elseif ($user->isCustomer()) {
+            return route('customer.dashboard');
+        }
+        
+        // Default fallback
+        return '/';
     }
 }

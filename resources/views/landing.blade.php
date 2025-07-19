@@ -367,7 +367,7 @@
                         <a class="nav-link" href="#kontak">Kontak</a>
                     </li>
                     <li class="nav-item ms-lg-3">
-                        <a class="btn btn-primary" href="#booking">Booking Servis</a>
+                        <a class="btn btn-primary" href="/login">Booking Servis</a>
                     </li>
                 </ul>
             </div>
@@ -382,7 +382,7 @@
                     <h1>Bengkel Spesialis Motor & Sepeda Listrik</h1>
                     <p>Layanan servis berkualitas tinggi dengan teknisi berpengalaman untuk menjaga kendaraan listrik Anda tetap prima dan handal.</p>
                     <div class="d-flex gap-3">
-                        <a href="#booking" class="btn btn-primary">Booking Sekarang</a>
+                        <a href="/login" class="btn btn-primary">Booking Sekarang</a>
                         <a href="#layanan" class="btn btn-outline-dark">Lihat Layanan</a>
                     </div>
                 </div>
@@ -629,108 +629,6 @@
                         <p>"Saya sangat puas dengan upgrade performa yang dilakukan pada motor listrik saya. Sekarang kecepatan dan akselerasinya jauh lebih baik."</p>
                         <h5>Rudi Hermawan</h5>
                         <p class="text-muted small">Pemilik Motor Listrik</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Booking Section -->
-    <section class="py-5 bg-light" id="booking">
-        <div class="container">
-            <div class="row">
-                <div class="col-lg-6 mb-4 mb-lg-0" data-aos="fade-right" data-aos-duration="1000">
-                    <h2 class="section-title">Booking Servis Online</h2>
-                    <p class="mb-4">Booking jadwal servis kendaraan Anda dengan mudah tanpa perlu antri. Isi form di samping dan pilih waktu yang nyaman untuk Anda.</p>
-
-                    <div class="feature-item">
-                        <div class="feature-icon">
-                            <i class="fas fa-calendar-check"></i>
-                        </div>
-                        <div>
-                            <h5>Mudah dan Cepat</h5>
-                            <p>Proses booking hanya membutuhkan waktu kurang dari 2 menit.</p>
-                        </div>
-                    </div>
-
-                    <div class="feature-item">
-                        <div class="feature-icon">
-                            <i class="fas fa-clock"></i>
-                        </div>
-                        <div>
-                            <h5>Hemat Waktu</h5>
-                            <p>Tidak perlu menunggu lama, kendaraan akan langsung diproses sesuai jadwal.</p>
-                        </div>
-                    </div>
-
-                    <div class="feature-item">
-                        <div class="feature-icon">
-                            <i class="fas fa-history"></i>
-                        </div>
-                        <div>
-                            <h5>Lacak Status</h5>
-                            <p>Dapatkan kode tracking untuk memantau proses servis kendaraan Anda.</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-6" data-aos="fade-left" data-aos-duration="1000" data-aos-delay="200">
-                    <div class="appointment-form">
-                        <form>
-                            <div class="mb-3">
-                                <label for="name" class="form-label">Nama Lengkap</label>
-                                <input type="text" class="form-control" id="name" placeholder="Masukkan nama lengkap Anda">
-                            </div>
-                            <div class="mb-3">
-                                <label for="phone" class="form-label">Nomor Telepon</label>
-                                <input type="tel" class="form-control" id="phone" placeholder="Contoh: 081234567890">
-                            </div>
-                            <div class="mb-3">
-                                <label for="email" class="form-label">Email (Opsional)</label>
-                                <input type="email" class="form-control" id="email" placeholder="Contoh: nama@email.com">
-                            </div>
-                            <div class="mb-3">
-                                <label for="vehicle" class="form-label">Jenis Kendaraan</label>
-                                <select class="form-select" id="vehicle">
-                                    <option selected disabled>Pilih jenis kendaraan</option>
-                                    <option>Motor Listrik</option>
-                                    <option>Sepeda Listrik</option>
-                                    <option>Skuter Listrik</option>
-                                    <option>Lainnya</option>
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <label for="service" class="form-label">Jenis Layanan</label>
-                                <select class="form-select" id="service">
-                                    <option selected disabled>Pilih jenis layanan</option>
-                                    <option>Servis Rutin</option>
-                                    <option>Servis Baterai</option>
-                                    <option>Perbaikan Motor Listrik</option>
-                                    <option>Diagnosa Sistem Elektronik</option>
-                                    <option>Penggantian Sparepart</option>
-                                    <option>Upgrade Performa</option>
-                                    <option>Lainnya</option>
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <label for="date" class="form-label">Tanggal Servis</label>
-                                <input type="date" class="form-control" id="date">
-                            </div>
-                            <div class="mb-3">
-                                <label for="time" class="form-label">Waktu Servis</label>
-                                <select class="form-select" id="time">
-                                    <option selected disabled>Pilih waktu</option>
-                                    <option>08:00 - 10:00</option>
-                                    <option>10:00 - 12:00</option>
-                                    <option>13:00 - 15:00</option>
-                                    <option>15:00 - 17:00</option>
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <label for="notes" class="form-label">Catatan Tambahan</label>
-                                <textarea class="form-control" id="notes" rows="3" placeholder="Deskripsi masalah atau permintaan khusus"></textarea>
-                            </div>
-                            <button type="submit" class="btn btn-primary w-100">Booking Sekarang</button>
-                        </form>
                     </div>
                 </div>
             </div>

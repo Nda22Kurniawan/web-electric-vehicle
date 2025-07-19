@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 
-
 class WorkOrder extends Model
 {
     use HasFactory;
@@ -19,8 +18,9 @@ class WorkOrder extends Model
      */
     protected $fillable = [
         'appointment_id',
-        'customer_name',
-        'customer_phone',
+        'customer_id',
+        'customer_name', // nullable untuk backward compatibility
+        'customer_phone', // nullable untuk backward compatibility
         'vehicle_id',
         'mechanic_id',
         'work_order_number',
@@ -42,6 +42,14 @@ class WorkOrder extends Model
         'end_time' => 'datetime',
         'total_amount' => 'decimal:2',
     ];
+
+    /**
+     * Get the customer that owns the work order.
+     */
+    public function customer()
+    {
+        return $this->belongsTo(User::class, 'customer_id');
+    }
 
     /**
      * Get the appointment that belongs to the work order.
@@ -192,5 +200,21 @@ class WorkOrder extends Model
         
         $this->payment_status = $status;
         $this->save();
+    }
+
+    /**
+     * Get customer name (from relationship or fallback to stored value)
+     */
+    public function getCustomerNameAttribute()
+    {
+        return $this->customer ? $this->customer->name : $this->attributes['customer_name'];
+    }
+
+    /**
+     * Get customer phone (from relationship or fallback to stored value)
+     */
+    public function getCustomerPhoneAttribute()
+    {
+        return $this->customer ? $this->customer->phone : $this->attributes['customer_phone'];
     }
 }
