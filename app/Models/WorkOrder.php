@@ -19,8 +19,6 @@ class WorkOrder extends Model
     protected $fillable = [
         'appointment_id',
         'customer_id',
-        'customer_name', // nullable untuk backward compatibility
-        'customer_phone', // nullable untuk backward compatibility
         'vehicle_id',
         'mechanic_id',
         'work_order_number',

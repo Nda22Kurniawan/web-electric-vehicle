@@ -155,6 +155,7 @@
                                 <br><small class="text-muted">{{ \Carbon\Carbon::parse($workOrder->created_at)->format('H:i') }}</small>
                             </td>
                             <td>
+                                {{-- Use accessor methods from model --}}
                                 <strong>{{ $workOrder->customer_name }}</strong>
                                 <br><small class="text-muted">{{ $workOrder->customer_phone }}</small>
                             </td>
@@ -242,6 +243,33 @@
                                             <li><a class="dropdown-item" href="{{ route('payments.index', $workOrder->id) }}">
                                                 <i class="fas fa-list me-2"></i>Riwayat Pembayaran
                                             </a></li>
+                                            @if($workOrder->status != 'completed' && $workOrder->status != 'cancelled')
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li>
+                                                <form action="{{ route('work-orders.update-status', $workOrder->id) }}" method="POST" class="d-inline">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                    <input type="hidden" name="status" value="in_progress">
+                                                    <button type="submit" class="dropdown-item" 
+                                                            onclick="return confirm('Ubah status ke Dalam Proses?')"
+                                                            @if($workOrder->status == 'in_progress') disabled @endif>
+                                                        <i class="fas fa-play me-2"></i>Mulai Proses
+                                                    </button>
+                                                </form>
+                                            </li>
+                                            <li>
+                                                <form action="{{ route('work-orders.update-status', $workOrder->id) }}" method="POST" class="d-inline">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                    <input type="hidden" name="status" value="completed">
+                                                    <button type="submit" class="dropdown-item" 
+                                                            onclick="return confirm('Tandai sebagai Selesai?')"
+                                                            @if($workOrder->status == 'completed') disabled @endif>
+                                                        <i class="fas fa-check me-2"></i>Selesai
+                                                    </button>
+                                                </form>
+                                            </li>
+                                            @endif
                                             @if($workOrder->status == 'pending')
                                             <li><hr class="dropdown-divider"></li>
                                             <li>
@@ -295,6 +323,7 @@
             </div>
             @endif
 
+            {{-- Statistics Summary - Fixed to work properly with pagination --}}
             @if($workOrders->count() > 0)
             <div class="mt-3">
                 <div class="row text-center">
@@ -305,53 +334,85 @@
                     </div>
                     <div class="col-md-3">
                         <div class="alert alert-warning mb-0">
-                            <strong>Pending:</strong> {{ $workOrders->where('status', 'pending')->count() }}
+                            <strong>Pending:</strong> 
+                            {{ \App\Models\WorkOrder::where('status', 'pending')
+                                ->when(request('search'), function($q, $search) {
+                                    return $q->where(function($subQ) use ($search) {
+                                        $subQ->where('work_order_number', 'like', "%{$search}%")
+                                             ->orWhere('customer_name', 'like', "%{$search}%")
+                                             ->orWhere('customer_phone', 'like', "%{$search}%");
+                                    });
+                                })
+                                ->when(request('mechanic_id'), function($q, $mechanicId) {
+                                    return $q->where('mechanic_id', $mechanicId);
+                                })
+                                ->when(request('payment_status'), function($q, $paymentStatus) {
+                                    return $q->where('payment_status', $paymentStatus);
+                                })
+                                ->when(request('start_date'), function($q, $startDate) {
+                                    return $q->whereDate('created_at', '>=', $startDate);
+                                })
+                                ->when(request('end_date'), function($q, $endDate) {
+                                    return $q->whereDate('created_at', '<=', $endDate);
+                                })
+                                ->count() }}
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="alert alert-primary mb-0">
-                            <strong>Dalam Proses:</strong> {{ $workOrders->where('status', 'in_progress')->count() }}
+                            <strong>Dalam Proses:</strong> 
+                            {{ \App\Models\WorkOrder::where('status', 'in_progress')
+                                ->when(request('search'), function($q, $search) {
+                                    return $q->where(function($subQ) use ($search) {
+                                        $subQ->where('work_order_number', 'like', "%{$search}%")
+                                             ->orWhere('customer_name', 'like', "%{$search}%")
+                                             ->orWhere('customer_phone', 'like', "%{$search}%");
+                                    });
+                                })
+                                ->when(request('mechanic_id'), function($q, $mechanicId) {
+                                    return $q->where('mechanic_id', $mechanicId);
+                                })
+                                ->when(request('payment_status'), function($q, $paymentStatus) {
+                                    return $q->where('payment_status', $paymentStatus);
+                                })
+                                ->when(request('start_date'), function($q, $startDate) {
+                                    return $q->whereDate('created_at', '>=', $startDate);
+                                })
+                                ->when(request('end_date'), function($q, $endDate) {
+                                    return $q->whereDate('created_at', '<=', $endDate);
+                                })
+                                ->count() }}
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="alert alert-success mb-0">
-                            <strong>Selesai:</strong> {{ $workOrders->where('status', 'completed')->count() }}
+                            <strong>Selesai:</strong> 
+                            {{ \App\Models\WorkOrder::where('status', 'completed')
+                                ->when(request('search'), function($q, $search) {
+                                    return $q->where(function($subQ) use ($search) {
+                                        $subQ->where('work_order_number', 'like', "%{$search}%")
+                                             ->orWhere('customer_name', 'like', "%{$search}%")
+                                             ->orWhere('customer_phone', 'like', "%{$search}%");
+                                    });
+                                })
+                                ->when(request('mechanic_id'), function($q, $mechanicId) {
+                                    return $q->where('mechanic_id', $mechanicId);
+                                })
+                                ->when(request('payment_status'), function($q, $paymentStatus) {
+                                    return $q->where('payment_status', $paymentStatus);
+                                })
+                                ->when(request('start_date'), function($q, $startDate) {
+                                    return $q->whereDate('created_at', '>=', $startDate);
+                                })
+                                ->when(request('end_date'), function($q, $endDate) {
+                                    return $q->whereDate('created_at', '<=', $endDate);
+                                })
+                                ->count() }}
                         </div>
                     </div>
                 </div>
             </div>
             @endif
-        </div>
-    </div>
-</div>
-
-<!-- Quick Status Update Modal -->
-<div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="statusModalLabel">Update Status Work Order</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form id="statusForm" method="POST">
-                @csrf
-                @method('PATCH')
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="status" class="form-label">Status Baru</label>
-                        <select class="form-select" id="modalStatus" name="status" required>
-                            <option value="pending">Pending</option>
-                            <option value="in_progress">Dalam Proses</option>
-                            <option value="completed">Selesai</option>
-                            <option value="cancelled">Dibatalkan</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-primary">Update Status</button>
-                </div>
-            </form>
         </div>
     </div>
 </div>
@@ -372,16 +433,6 @@
         // Auto submit form on filter change
         $('#status, #payment_status, #mechanic_id, #sort_by, #sort_direction').change(function() {
             $('#filterForm').submit();
-        });
-
-        // Status update modal
-        $('.update-status').click(function() {
-            var workOrderId = $(this).data('id');
-            var currentStatus = $(this).data('status');
-            
-            $('#statusForm').attr('action', '/work-orders/' + workOrderId + '/status');
-            $('#modalStatus').val(currentStatus);
-            $('#statusModal').modal('show');
         });
 
         // Clear filters

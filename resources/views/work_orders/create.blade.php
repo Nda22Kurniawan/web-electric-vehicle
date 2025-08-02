@@ -13,6 +13,11 @@
                 <div>
                     <i class="fas fa-plus-circle me-1"></i>
                     Buat Work Order Baru
+                    @if(isset($appointment))
+                        <small class="text-info ms-2">
+                            <i class="fas fa-calendar-check"></i> Dari Appointment
+                        </small>
+                    @endif
                 </div>
                 <div>
                     <a href="{{ route('work-orders.index') }}" class="btn btn-sm btn-outline-secondary">
@@ -38,22 +43,32 @@
                         <h5 class="mb-3"><i class="fas fa-user me-2"></i> Informasi Pelanggan</h5>
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label for="customer_name" class="form-label">Nama Pelanggan</label>
-                                <input type="text" class="form-control @error('customer_name') is-invalid @enderror" 
-                                    id="customer_name" name="customer_name" 
-                                    value="{{ old('customer_name', $appointment->customer_name ?? '') }}" required>
-                                @error('customer_name')
+                                <label for="customer_id" class="form-label">Pilih Pelanggan</label>
+                                <select class="form-select @error('customer_id') is-invalid @enderror" 
+                                        id="customer_id" name="customer_id" required>
+                                    <option value="">Pilih Pelanggan Terdaftar</option>
+                                    @foreach($customers as $customerOption)
+                                        <option value="{{ $customerOption->id }}" 
+                                                data-name="{{ $customerOption->name }}"
+                                                data-phone="{{ $customerOption->phone }}"
+                                                {{ old('customer_id', $customer->id ?? '') == $customerOption->id ? 'selected' : '' }}>
+                                            {{ $customerOption->name }} - {{ $customerOption->phone }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @error('customer_id')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
                             </div>
                             <div class="col-md-6">
-                                <label for="customer_phone" class="form-label">No. Telepon</label>
-                                <input type="text" class="form-control @error('customer_phone') is-invalid @enderror" 
-                                    id="customer_phone" name="customer_phone" 
-                                    value="{{ old('customer_phone', $appointment->customer_phone ?? '') }}" required>
-                                @error('customer_phone')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
+                                <div class="card bg-light">
+                                    <div class="card-body">
+                                        <h6 class="card-title mb-2">Info Pelanggan</h6>
+                                        <div id="customer-info">
+                                            <p class="mb-1"><small class="text-muted">Pilih pelanggan untuk melihat detail</small></p>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -67,12 +82,12 @@
                             <div class="col-md-6">
                                 <label for="vehicle_id" class="form-label">Kendaraan</label>
                                 <select class="form-select @error('vehicle_id') is-invalid @enderror" 
-                                    id="vehicle_id" name="vehicle_id" required>
+                                        id="vehicle_id" name="vehicle_id" required>
                                     <option value="">Pilih Kendaraan</option>
-                                    @foreach($vehicles as $vehicle)
-                                        <option value="{{ $vehicle->id }}" 
-                                            {{ old('vehicle_id', isset($vehicle) && $vehicle->id == $vehicle->id ? 'selected' : '') }}>
-                                            {{ $vehicle->license_plate }} - {{ $vehicle->brand }} {{ $vehicle->model }}
+                                    @foreach($vehicles as $vehicleOption)
+                                        <option value="{{ $vehicleOption->id }}" 
+                                                {{ old('vehicle_id', $vehicle->id ?? '') == $vehicleOption->id ? 'selected' : '' }}>
+                                            {{ $vehicleOption->license_plate }} - {{ $vehicleOption->brand }} {{ $vehicleOption->model }}
                                         </option>
                                     @endforeach
                                 </select>
@@ -83,7 +98,7 @@
                             <div class="col-md-6">
                                 <label for="mechanic_id" class="form-label">Mekanik</label>
                                 <select class="form-select @error('mechanic_id') is-invalid @enderror" 
-                                    id="mechanic_id" name="mechanic_id" required>
+                                        id="mechanic_id" name="mechanic_id" required>
                                     <option value="">Pilih Mekanik</option>
                                     @foreach($mechanics as $mechanic)
                                         <option value="{{ $mechanic->id }}" {{ old('mechanic_id') == $mechanic->id ? 'selected' : '' }}>
@@ -106,7 +121,7 @@
                         <div class="mb-3">
                             <label for="diagnosis" class="form-label">Diagnosis Awal</label>
                             <textarea class="form-control @error('diagnosis') is-invalid @enderror" 
-                                id="diagnosis" name="diagnosis" rows="3">{{ old('diagnosis', $appointment->description ?? '') }}</textarea>
+                                      id="diagnosis" name="diagnosis" rows="3">{{ old('diagnosis', $appointment->description ?? '') }}</textarea>
                             @error('diagnosis')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
@@ -136,7 +151,8 @@
                                                     <option value="">Pilih Layanan</option>
                                                     @foreach($services as $serviceOption)
                                                         <option value="{{ $serviceOption->id }}" 
-                                                            {{ $service['service_id'] == $serviceOption->id ? 'selected' : '' }}>
+                                                                data-price="{{ $serviceOption->price }}"
+                                                                {{ $service['service_id'] == $serviceOption->id ? 'selected' : '' }}>
                                                             {{ $serviceOption->name }} (Rp {{ number_format($serviceOption->price, 0, ',', '.') }})
                                                         </option>
                                                     @endforeach
@@ -145,14 +161,14 @@
                                             <div class="col-md-2">
                                                 <label class="form-label">Quantity</label>
                                                 <input type="number" class="form-control service-quantity" 
-                                                    name="services[{{ $index }}][quantity]" min="1" 
-                                                    value="{{ $service['quantity'] }}" required>
+                                                       name="services[{{ $index }}][quantity]" min="1" 
+                                                       value="{{ $service['quantity'] }}" required>
                                             </div>
                                             <div class="col-md-3">
                                                 <label class="form-label">Harga</label>
                                                 <input type="number" class="form-control service-price" 
-                                                    name="services[{{ $index }}][price]" 
-                                                    value="{{ $service['price'] }}" required>
+                                                       name="services[{{ $index }}][price]" 
+                                                       value="{{ $service['price'] }}" step="0.01" required>
                                             </div>
                                             <div class="col-md-2 d-flex align-items-end">
                                                 <button type="button" class="btn btn-danger btn-sm remove-service">
@@ -162,8 +178,8 @@
                                             <div class="col-12">
                                                 <label class="form-label">Catatan</label>
                                                 <input type="text" class="form-control" 
-                                                    name="services[{{ $index }}][notes]" 
-                                                    value="{{ $service['notes'] ?? '' }}">
+                                                       name="services[{{ $index }}][notes]" 
+                                                       value="{{ $service['notes'] ?? '' }}">
                                             </div>
                                         </div>
                                     </div>
@@ -195,9 +211,10 @@
                                                     <option value="">Pilih Spare Part</option>
                                                     @foreach($parts as $partOption)
                                                         <option value="{{ $partOption->id }}" 
-                                                            data-stock="{{ $partOption->stock }}"
-                                                            {{ $part['part_id'] == $partOption->id ? 'selected' : '' }}>
-                                                            {{ $partOption->name }} (Stok: {{ $partOption->stock }})
+                                                                data-stock="{{ $partOption->stock }}"
+                                                                data-price="{{ $partOption->price }}"
+                                                                {{ $part['part_id'] == $partOption->id ? 'selected' : '' }}>
+                                                            {{ $partOption->name }} (Stok: {{ $partOption->stock }}) - Rp {{ number_format($partOption->price, 0, ',', '.') }}
                                                         </option>
                                                     @endforeach
                                                 </select>
@@ -205,14 +222,14 @@
                                             <div class="col-md-2">
                                                 <label class="form-label">Quantity</label>
                                                 <input type="number" class="form-control part-quantity" 
-                                                    name="parts[{{ $index }}][quantity]" min="1" 
-                                                    value="{{ $part['quantity'] }}" required>
+                                                       name="parts[{{ $index }}][quantity]" min="1" 
+                                                       value="{{ $part['quantity'] }}" required>
                                             </div>
                                             <div class="col-md-3">
                                                 <label class="form-label">Harga</label>
                                                 <input type="number" class="form-control part-price" 
-                                                    name="parts[{{ $index }}][price]" 
-                                                    value="{{ $part['price'] }}" required>
+                                                       name="parts[{{ $index }}][price]" 
+                                                       value="{{ $part['price'] }}" step="0.01" required>
                                             </div>
                                             <div class="col-md-2 d-flex align-items-end">
                                                 <button type="button" class="btn btn-danger btn-sm remove-part">
@@ -255,6 +272,30 @@
         // Part counter
         let partCounter = {{ old('parts') ? count(old('parts')) : 0 }};
         
+        // Customer selection handler
+        const customerSelect = document.getElementById('customer_id');
+        const customerInfo = document.getElementById('customer-info');
+        
+        customerSelect.addEventListener('change', function() {
+            if (this.value) {
+                const selectedOption = this.options[this.selectedIndex];
+                const name = selectedOption.getAttribute('data-name');
+                const phone = selectedOption.getAttribute('data-phone');
+                
+                customerInfo.innerHTML = `
+                    <p class="mb-1"><strong>Nama:</strong> ${name}</p>
+                    <p class="mb-0"><strong>Telepon:</strong> ${phone}</p>
+                `;
+            } else {
+                customerInfo.innerHTML = '<p class="mb-1"><small class="text-muted">Pilih pelanggan untuk melihat detail</small></p>';
+            }
+        });
+        
+        // Initialize customer info if already selected
+        if (customerSelect.value) {
+            customerSelect.dispatchEvent(new Event('change'));
+        }
+        
         // Add service row
         document.getElementById('addService').addEventListener('click', function() {
             const container = document.getElementById('servicesContainer');
@@ -278,12 +319,12 @@
                     <div class="col-md-2">
                         <label class="form-label">Quantity</label>
                         <input type="number" class="form-control service-quantity" 
-                            name="services[${index}][quantity]" min="1" value="1" required>
+                               name="services[${index}][quantity]" min="1" value="1" required>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label">Harga</label>
                         <input type="number" class="form-control service-price" 
-                            name="services[${index}][price]" required>
+                               name="services[${index}][price]" step="0.01" required>
                     </div>
                     <div class="col-md-2 d-flex align-items-end">
                         <button type="button" class="btn btn-danger btn-sm remove-service">
@@ -304,9 +345,11 @@
             const priceInput = serviceRow.querySelector('.service-price');
             
             select.addEventListener('change', function() {
-                const selectedOption = this.options[this.selectedIndex];
-                const price = selectedOption.getAttribute('data-price');
-                priceInput.value = price;
+                if (this.value) {
+                    const selectedOption = this.options[this.selectedIndex];
+                    const price = selectedOption.getAttribute('data-price');
+                    priceInput.value = price;
+                }
             });
         });
         
@@ -325,9 +368,9 @@
                             <option value="">Pilih Spare Part</option>
                             @foreach($parts as $part)
                                 <option value="{{ $part->id }}" 
-                                    data-stock="{{ $part->stock }}"
-                                    data-price="{{ $part->price }}">
-                                    {{ $part->name }} (Stok: {{ $part->stock }})
+                                        data-stock="{{ $part->stock }}"
+                                        data-price="{{ $part->price }}">
+                                    {{ $part->name }} (Stok: {{ $part->stock }}) - Rp {{ number_format($part->price, 0, ',', '.') }}
                                 </option>
                             @endforeach
                         </select>
@@ -335,12 +378,12 @@
                     <div class="col-md-2">
                         <label class="form-label">Quantity</label>
                         <input type="number" class="form-control part-quantity" 
-                            name="parts[${index}][quantity]" min="1" value="1" required>
+                               name="parts[${index}][quantity]" min="1" value="1" required>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label">Harga</label>
                         <input type="number" class="form-control part-price" 
-                            name="parts[${index}][price]" required>
+                               name="parts[${index}][price]" step="0.01" required>
                     </div>
                     <div class="col-md-2 d-flex align-items-end">
                         <button type="button" class="btn btn-danger btn-sm remove-part">
@@ -360,28 +403,39 @@
             const stockInfo = partRow.querySelector('.stock-info');
             
             select.addEventListener('change', function() {
-                const selectedOption = this.options[this.selectedIndex];
-                const price = selectedOption.getAttribute('data-price');
-                const stock = selectedOption.getAttribute('data-stock');
-                
-                priceInput.value = price;
-                stockInfo.textContent = `Stok tersedia: ${stock}`;
-                
-                // Set max quantity to available stock
-                quantityInput.max = stock;
+                if (this.value) {
+                    const selectedOption = this.options[this.selectedIndex];
+                    const price = selectedOption.getAttribute('data-price');
+                    const stock = selectedOption.getAttribute('data-stock');
+                    
+                    priceInput.value = price;
+                    stockInfo.textContent = `Stok tersedia: ${stock}`;
+                    
+                    // Set max quantity to available stock
+                    quantityInput.max = stock;
+                    
+                    // If current quantity exceeds stock, reset to max available
+                    if (parseInt(quantityInput.value) > parseInt(stock)) {
+                        quantityInput.value = stock;
+                    }
+                } else {
+                    priceInput.value = '';
+                    stockInfo.textContent = '';
+                    quantityInput.removeAttribute('max');
+                }
             });
         });
         
-        // Remove service row
+        // Remove service/part row
         document.addEventListener('click', function(e) {
-            if (e.target.classList.contains('remove-service')) {
+            if (e.target.classList.contains('remove-service') || e.target.closest('.remove-service')) {
                 const serviceRow = e.target.closest('.service-row');
                 if (confirm('Apakah Anda yakin ingin menghapus layanan ini?')) {
                     serviceRow.remove();
                 }
             }
             
-            if (e.target.classList.contains('remove-part')) {
+            if (e.target.classList.contains('remove-part') || e.target.closest('.remove-part')) {
                 const partRow = e.target.closest('.part-row');
                 if (confirm('Apakah Anda yakin ingin menghapus part ini?')) {
                     partRow.remove();
@@ -394,9 +448,11 @@
             const priceInput = select.closest('.service-row').querySelector('.service-price');
             
             select.addEventListener('change', function() {
-                const selectedOption = this.options[this.selectedIndex];
-                const price = selectedOption.getAttribute('data-price');
-                priceInput.value = price;
+                if (this.value) {
+                    const selectedOption = this.options[this.selectedIndex];
+                    const price = selectedOption.getAttribute('data-price');
+                    priceInput.value = price;
+                }
             });
             
             // Trigger change if already selected
@@ -409,18 +465,27 @@
         document.querySelectorAll('.part-select').forEach(select => {
             const priceInput = select.closest('.part-row').querySelector('.part-price');
             const stockInfo = select.closest('.part-row').querySelector('.stock-info');
+            const quantityInput = select.closest('.part-row').querySelector('.part-quantity');
             
             select.addEventListener('change', function() {
-                const selectedOption = this.options[this.selectedIndex];
-                const price = selectedOption.getAttribute('data-price');
-                const stock = selectedOption.getAttribute('data-stock');
-                
-                priceInput.value = price;
-                stockInfo.textContent = `Stok tersedia: ${stock}`;
-                
-                // Set max quantity to available stock
-                const quantityInput = select.closest('.part-row').querySelector('.part-quantity');
-                quantityInput.max = stock;
+                if (this.value) {
+                    const selectedOption = this.options[this.selectedIndex];
+                    const price = selectedOption.getAttribute('data-price');
+                    const stock = selectedOption.getAttribute('data-stock');
+                    
+                    priceInput.value = price;
+                    stockInfo.textContent = `Stok tersedia: ${stock}`;
+                    quantityInput.max = stock;
+                    
+                    // If current quantity exceeds stock, reset to max available
+                    if (parseInt(quantityInput.value) > parseInt(stock)) {
+                        quantityInput.value = stock;
+                    }
+                } else {
+                    priceInput.value = '';
+                    stockInfo.textContent = '';
+                    quantityInput.removeAttribute('max');
+                }
             });
             
             // Trigger change if already selected
@@ -431,6 +496,14 @@
         
         // Form validation
         document.getElementById('workOrderForm').addEventListener('submit', function(e) {
+            // Check if customer is selected
+            if (!customerSelect.value) {
+                e.preventDefault();
+                alert('Harap pilih pelanggan.');
+                customerSelect.focus();
+                return false;
+            }
+            
             // Check if at least one service or part is added
             const serviceRows = document.querySelectorAll('.service-row');
             const partRows = document.querySelectorAll('.part-row');
@@ -443,6 +516,8 @@
             
             // Check part quantities don't exceed stock
             let valid = true;
+            const invalidElements = [];
+            
             document.querySelectorAll('.part-select').forEach(select => {
                 if (select.value) {
                     const selectedOption = select.options[select.selectedIndex];
@@ -453,10 +528,25 @@
                     if (quantity > stock) {
                         valid = false;
                         quantityInput.classList.add('is-invalid');
+                        
+                        // Remove existing feedback
+                        const existingFeedback = quantityInput.parentNode.querySelector('.invalid-feedback');
+                        if (existingFeedback) {
+                            existingFeedback.remove();
+                        }
+                        
                         const feedback = document.createElement('div');
                         feedback.className = 'invalid-feedback';
-                        feedback.textContent = 'Jumlah melebihi stok yang tersedia.';
+                        feedback.textContent = `Jumlah melebihi stok yang tersedia (${stock}).`;
                         quantityInput.parentNode.appendChild(feedback);
+                        
+                        invalidElements.push(quantityInput);
+                    } else {
+                        quantityInput.classList.remove('is-invalid');
+                        const existingFeedback = quantityInput.parentNode.querySelector('.invalid-feedback');
+                        if (existingFeedback) {
+                            existingFeedback.remove();
+                        }
                     }
                 }
             });
@@ -464,6 +554,9 @@
             if (!valid) {
                 e.preventDefault();
                 alert('Beberapa jumlah part melebihi stok yang tersedia. Harap periksa kembali.');
+                if (invalidElements.length > 0) {
+                    invalidElements[0].focus();
+                }
                 return false;
             }
         });

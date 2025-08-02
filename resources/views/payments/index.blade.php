@@ -131,7 +131,7 @@
                                     <a href="{{ route('payments.show', [$workOrder, $payment]) }}" class="btn btn-info btn-sm" title="Detail">
                                         <i class="fas fa-eye"></i>
                                     </a>
-                                    <a href="{{ route('payments.receipt', [$workOrder, $payment]) }}" class="btn btn-success btn-sm" title="Kwitansi">
+                                    <a href="{{ route('payments.receipt', $payment) }}" class="btn btn-success btn-sm" title="Kwitansi">
                                         <i class="fas fa-file-pdf"></i>
                                     </a>
                                     <a href="{{ route('payments.edit', [$workOrder, $payment]) }}" class="btn btn-warning btn-sm" title="Edit">

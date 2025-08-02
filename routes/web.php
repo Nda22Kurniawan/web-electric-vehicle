@@ -63,10 +63,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/inventory-transactions/report', [InventoryTransactionController::class, 'report'])->name('inventory-transactions.report');
         Route::get('/inventory-transactions/movement', [InventoryTransactionController::class, 'movementReport'])->name('inventory-transactions.movement');
 
-        Route::resource('work-orders', WorkOrderController::class);
-        Route::get('/work-orders/invoice', [WorkOrderController::class, 'invoice'])->name('work-orders.invoice');
-        Route::get('/work-orders/receipt', [WorkOrderController::class, 'receipt'])->name('work-orders.receipt');
-        Route::get('/work-orders/show', [WorkOrderController::class, 'show'])->name('work-orders.show');
+        // Route::resource('work-orders', WorkOrderController::class);
+        // Route::get('/work-orders/invoice', [WorkOrderController::class, 'invoice'])->name('work-orders.invoice');
+        // Route::get('/work-orders/receipt', [WorkOrderController::class, 'receipt'])->name('work-orders.receipt');
+        // Route::get('/work-orders/show', [WorkOrderController::class, 'show'])->name('work-orders.show');
     });
 
     // Mechanic routes
@@ -84,27 +84,30 @@ Route::middleware('auth')->group(function () {
     // Customer routes
     Route::middleware('can:customer')->group(function () {
         Route::get('/customer/dashboard', [CustomerController::class, 'dashboard'])->name('customer.dashboard');
-        
+
         // Customer specific routes
         Route::get('/customer/bookings', [CustomerController::class, 'bookings'])->name('customer.bookings');
         Route::get('/customer/bookings/create', [CustomerController::class, 'createBooking'])->name('customer.bookings.create');
         Route::post('/customer/bookings', [CustomerController::class, 'storeBooking'])->name('customer.bookings.store');
         Route::get('/customer/bookings/history', [CustomerController::class, 'bookingHistory'])->name('customer.bookings.history');
-        
+
         Route::get('/customer/vehicles', [CustomerController::class, 'vehicles'])->name('customer.vehicles');
         Route::get('/customer/vehicles/create', [CustomerController::class, 'createVehicle'])->name('customer.vehicles.create');
         Route::post('/customer/vehicles', [CustomerController::class, 'storeVehicle'])->name('customer.vehicles.store');
         Route::get('/customer/vehicles/{vehicle}/edit', [CustomerController::class, 'editVehicle'])->name('customer.vehicles.edit');
         Route::put('/customer/vehicles/{vehicle}', [CustomerController::class, 'updateVehicle'])->name('customer.vehicles.update');
-        
+
         Route::get('/customer/profile', [CustomerController::class, 'profile'])->name('customer.profile');
         Route::put('/customer/profile', [CustomerController::class, 'updateProfile'])->name('customer.profile.update');
     });
 
     // Common routes for all authenticated users
-    // Appointments with custom routes
+    // Appointments with custom routes - TAMBAHAN ROUTE BARU
+    Route::get('/appointments/customer-details', [AppointmentController::class, 'getCustomerDetails'])
+        ->name('appointments.get-customer-details');
     Route::get('/appointments/today', [AppointmentController::class, 'today'])->name('appointments.today');
     Route::get('/appointments/track', [AppointmentController::class, 'track'])->name('appointments.track');
+    Route::post('/appointments/track', [AppointmentController::class, 'track'])->name('appointments.track');
     Route::put('appointments/{appointment}/status', [AppointmentController::class, 'updateStatus'])
         ->name('appointments.update-status');
     Route::resource('appointments', AppointmentController::class);
@@ -119,6 +122,22 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('services', ServiceController::class);
     Route::resource('service-schedules', ServiceScheduleController::class);
+
+    Route::resource('work-orders', WorkOrderController::class);
+
+    // Tambahan route khusus
+    Route::patch('/work-orders/{workOrder}/status', [WorkOrderController::class, 'updateStatus'])->name('work-orders.update-status');
+    Route::get('/work-orders/{workOrder}/invoice', [WorkOrderController::class, 'invoice'])->name('work-orders.invoice');
+    Route::get('/work-orders/{workOrder}/receipt', [WorkOrderController::class, 'receipt'])->name('work-orders.receipt');
+    Route::get('/work-orders/{workOrder}/create-payment', [WorkOrderController::class, 'createPayment'])->name('work-orders.create-payment');
+    Route::get('/work-orders/{workOrder}/payment', [WorkOrderController::class, 'createPayment'])->name('work-orders.create-payment');
+    Route::post('/work-orders/{workOrder}/payment', [WorkOrderController::class, 'storePayment'])->name('work-orders.store-payment');
+    Route::get('/work-orders/show', [WorkOrderController::class, 'show'])->name('work-orders.show');
+
+    // Vehicle routes with custom route - TAMBAHAN ROUTE BARU
+    Route::get('/vehicles/by-customer', [VehicleController::class, 'getByCustomer'])->name('vehicles.getByCustomer');
+    Route::get('/vehicles/by-customer', [VehicleController::class, 'getByCustomer'])
+        ->name('vehicles.getByCustomer');
     Route::resource('vehicles', VehicleController::class);
 
     // Profile route

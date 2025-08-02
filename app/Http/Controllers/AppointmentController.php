@@ -80,15 +80,20 @@ class AppointmentController extends Controller
      * @return \Illuminate\Http\Response
      */
     public function create()
-    {
-        $vehicles = Vehicle::all();
-        $customers = User::where('role', 'customer')->get(); // Assuming you have a role field
-        $schedules = ServiceSchedule::where('is_closed', false)
-            ->orderBy('day_of_week')
-            ->get();
+{
+    // Get all customers (users with role 'customer')
+    $customers = User::where('role', 'customer')
+        ->orderBy('name')
+        ->get();
+    
+    // Get all schedules
+    $schedules = ServiceSchedule::orderBy('day_of_week')->get();
 
-        return view('appointments.create', compact('vehicles', 'customers', 'schedules'));
-    }
+    // Get all vehicles
+    $vehicles = Vehicle::all(); // <-- Tambahkan baris ini
+
+    return view('appointments.create', compact('customers', 'schedules', 'vehicles'));
+}
 
     /**
      * Store a newly created appointment in storage.
@@ -99,6 +104,7 @@ class AppointmentController extends Controller
     public function store(Request $request)
     {
         $validationRules = [
+            'customer_id' => 'required|exists:users,id',
             'vehicle_id' => 'required|exists:vehicles,id',
             'appointment_date' => 'required|date|after_or_equal:today',
             'appointment_time' => 'required|date_format:H:i',
@@ -106,16 +112,17 @@ class AppointmentController extends Controller
             'notes' => 'nullable|string',
         ];
 
-        // Check if using existing customer or new customer data
-        if ($request->filled('customer_id')) {
-            $validationRules['customer_id'] = 'required|exists:users,id';
-        } else {
-            $validationRules['customer_name'] = 'required|string|max:255';
-            $validationRules['customer_phone'] = 'required|string|max:15';
-            $validationRules['customer_email'] = 'nullable|email|max:255';
-        }
-
         $validator = Validator::make($request->all(), $validationRules);
+
+        // Additional validation to ensure vehicle belongs to customer
+        $validator->after(function ($validator) use ($request) {
+            if ($request->customer_id && $request->vehicle_id) {
+                $vehicle = Vehicle::find($request->vehicle_id);
+                if ($vehicle && $vehicle->customer_id != $request->customer_id) {
+                    $validator->errors()->add('vehicle_id', 'Kendaraan yang dipilih tidak milik customer tersebut.');
+                }
+            }
+        });
 
         if ($validator->fails()) {
             return redirect()->back()
@@ -156,29 +163,55 @@ class AppointmentController extends Controller
                 ->withInput();
         }
 
-        // Prepare data for creation
-        $appointmentData = [
+        // Create appointment
+        $appointment = Appointment::create([
+            'customer_id' => $request->customer_id,
             'vehicle_id' => $request->vehicle_id,
             'appointment_date' => $request->appointment_date,
             'appointment_time' => $request->appointment_time,
             'service_description' => $request->service_description,
             'status' => 'pending',
             'notes' => $request->notes,
-        ];
-
-        // Add customer data based on input type
-        if ($request->filled('customer_id')) {
-            $appointmentData['customer_id'] = $request->customer_id;
-        } else {
-            $appointmentData['customer_name'] = $request->customer_name;
-            $appointmentData['customer_phone'] = $request->customer_phone;
-            $appointmentData['customer_email'] = $request->customer_email;
-        }
-
-        $appointment = Appointment::create($appointmentData);
+        ]);
 
         return redirect()->route('appointments.show', $appointment)
             ->with('success', 'Janji service berhasil dibuat. Kode pelacakan: ' . $appointment->tracking_code);
+    }
+
+    /**
+     * Get customer details by ID (for AJAX)
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getCustomerDetails(Request $request)
+    {
+        $customerId = $request->get('customer_id');
+        
+        if (!$customerId) {
+            return response()->json(['success' => false]);
+        }
+
+        $customer = User::with('vehicles')->find($customerId);
+        
+        if (!$customer || $customer->role !== 'customer') {
+            return response()->json(['success' => false]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'customer' => [
+                'name' => $customer->name,
+                'phone' => $customer->phone,
+                'email' => $customer->email
+            ],
+            'vehicles' => $customer->vehicles->map(function($vehicle) {
+                return [
+                    'id' => $vehicle->id,
+                    'display_name' => $vehicle->brand . ' ' . $vehicle->model . ' (' . $vehicle->license_plate . ')'
+                ];
+            })
+        ]);
     }
 
     /**
@@ -201,15 +234,12 @@ class AppointmentController extends Controller
      */
     public function edit(Appointment $appointment)
     {
-        $vehicles = Vehicle::all();
-        $customers = User::where('role', 'customer')->get(); // Assuming you have a role field
-        $schedules = ServiceSchedule::where('is_closed', false)
-            ->orderBy('day_of_week')
-            ->get();
+        $customers = User::where('role', 'customer')->orderBy('name')->get();
+        $schedules = ServiceSchedule::orderBy('day_of_week')->get();
 
         $appointment->load(['vehicle', 'customer']);
 
-        return view('appointments.edit', compact('appointment', 'vehicles', 'customers', 'schedules'));
+        return view('appointments.edit', compact('appointment', 'customers', 'schedules'));
     }
 
     /**
@@ -259,6 +289,7 @@ class AppointmentController extends Controller
 
         // Full update validation (for edit form)
         $validationRules = [
+            'customer_id' => 'required|exists:users,id',
             'vehicle_id' => 'required|exists:vehicles,id',
             'appointment_date' => 'required|date|after_or_equal:today',
             'appointment_time' => 'required|date_format:H:i',
@@ -267,16 +298,17 @@ class AppointmentController extends Controller
             'notes' => 'nullable|string',
         ];
 
-        // Check if using existing customer or updating customer data
-        if ($request->filled('customer_id')) {
-            $validationRules['customer_id'] = 'required|exists:users,id';
-        } else {
-            $validationRules['customer_name'] = 'required|string|max:255';
-            $validationRules['customer_phone'] = 'required|string|max:15';
-            $validationRules['customer_email'] = 'nullable|email|max:255';
-        }
-
         $validator = Validator::make($request->all(), $validationRules);
+
+        // Additional validation to ensure vehicle belongs to customer
+        $validator->after(function ($validator) use ($request) {
+            if ($request->customer_id && $request->vehicle_id) {
+                $vehicle = Vehicle::find($request->vehicle_id);
+                if ($vehicle && $vehicle->customer_id != $request->customer_id) {
+                    $validator->errors()->add('vehicle_id', 'Kendaraan yang dipilih tidak milik customer tersebut.');
+                }
+            }
+        });
 
         if ($validator->fails()) {
             return redirect()->back()
@@ -325,31 +357,16 @@ class AppointmentController extends Controller
             }
         }
 
-        // Prepare update data
-        $updateData = [
+        // Update appointment
+        $appointment->update([
+            'customer_id' => $request->customer_id,
             'vehicle_id' => $request->vehicle_id,
             'appointment_date' => $request->appointment_date,
             'appointment_time' => $request->appointment_time,
             'service_description' => $request->service_description,
             'status' => $request->status,
             'notes' => $request->notes,
-        ];
-
-        // Handle customer data update
-        if ($request->filled('customer_id')) {
-            $updateData['customer_id'] = $request->customer_id;
-            // Clear old customer data if switching to registered customer
-            $updateData['customer_name'] = null;
-            $updateData['customer_phone'] = null;
-            $updateData['customer_email'] = null;
-        } else {
-            $updateData['customer_id'] = null;
-            $updateData['customer_name'] = $request->customer_name;
-            $updateData['customer_phone'] = $request->customer_phone;
-            $updateData['customer_email'] = $request->customer_email;
-        }
-
-        $appointment->update($updateData);
+        ]);
 
         return redirect()->route('appointments.show', $appointment)
             ->with('success', 'Janji service berhasil diperbarui.');
