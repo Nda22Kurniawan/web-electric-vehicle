@@ -101,9 +101,9 @@
                             <td>{{ $item->customer_name }}</td>
                             <td>
                                 @if($item->workOrder)
-                                    <span class="badge bg-primary">#{{ $item->workOrder->id }}</span>
+                                    <span class="badge bg-primary">#{{ $item->workOrder->id }} - {{ $item->workOrder->work_order_number }}</span>
                                     <br>
-                                    <small class="text-muted">{{ $item->workOrder->description ?? 'N/A' }}</small>
+                                    <small class="text-muted">{{ $item->workOrder->diagnosis ?? 'N/A' }}</small>
                                 @else
                                     <span class="text-muted">-</span>
                                 @endif

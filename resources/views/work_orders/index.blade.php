@@ -22,7 +22,8 @@
     </div>
     @endif
 
-    <!-- Filter Card -->
+    <!-- Filter Card - Hidden for customers -->
+    @if(Auth::user()->role !== 'customer')
     <div class="card mb-4">
         <div class="card-header">
             <i class="fas fa-filter me-1"></i>
@@ -107,20 +108,27 @@
             </form>
         </div>
     </div>
+    @endif
     
     <div class="card mb-4">
         <div class="card-header">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
                     <i class="fas fa-clipboard-list me-1"></i>
-                    Daftar Work Orders
+                    @if(Auth::user()->role === 'customer')
+                        Work Orders Saya
+                    @else
+                        Daftar Work Orders
+                    @endif
                     @if(request()->hasAny(['search', 'status', 'payment_status', 'mechanic_id', 'start_date', 'end_date']))
                         <small class="text-muted">({{ $workOrders->total() }} hasil filter)</small>
                     @endif
                 </div>
+                @if(Auth::user()->role !== 'customer')
                 <a href="{{ route('work-orders.create') }}" class="btn btn-primary btn-sm">
                     <i class="fas fa-plus me-1"></i> Buat Work Order
                 </a>
+                @endif
             </div>
         </div>
         <div class="card-body">
@@ -131,7 +139,9 @@
                             <th>No</th>
                             <th>No. Work Order</th>
                             <th>Tanggal</th>
+                            @if(Auth::user()->role !== 'customer')
                             <th>Pelanggan</th>
+                            @endif
                             <th>Kendaraan</th>
                             <th>Mekanik</th>
                             <th>Status</th>
@@ -154,11 +164,13 @@
                                 {{ \Carbon\Carbon::parse($workOrder->created_at)->format('d/m/Y') }}
                                 <br><small class="text-muted">{{ \Carbon\Carbon::parse($workOrder->created_at)->format('H:i') }}</small>
                             </td>
+                            @if(Auth::user()->role !== 'customer')
                             <td>
                                 {{-- Use accessor methods from model --}}
                                 <strong>{{ $workOrder->customer_name }}</strong>
                                 <br><small class="text-muted">{{ $workOrder->customer_phone }}</small>
                             </td>
+                            @endif
                             <td>
                                 @if($workOrder->vehicle)
                                     {{ $workOrder->vehicle->brand }} {{ $workOrder->vehicle->model }}
@@ -218,7 +230,7 @@
                                     <a href="{{ route('work-orders.show', $workOrder->id) }}" class="btn btn-info btn-sm" title="Detail">
                                         <i class="fas fa-eye"></i>
                                     </a>
-                                    @if($workOrder->status != 'completed' && $workOrder->status != 'cancelled')
+                                    @if(Auth::user()->role !== 'customer' && $workOrder->status != 'completed' && $workOrder->status != 'cancelled')
                                     <a href="{{ route('work-orders.edit', $workOrder->id) }}" class="btn btn-warning btn-sm" title="Edit">
                                         <i class="fas fa-edit"></i>
                                     </a>
@@ -234,53 +246,59 @@
                                             <li><a class="dropdown-item" href="{{ route('work-orders.receipt', $workOrder->id) }}">
                                                 <i class="fas fa-receipt me-2"></i>Kwitansi
                                             </a></li>
-                                            @if($workOrder->remaining_balance > 0)
-                                            <li><hr class="dropdown-divider"></li>
-                                            <li><a class="dropdown-item" href="{{ route('payments.create', $workOrder->id) }}">
-                                                <i class="fas fa-money-bill-wave me-2"></i>Tambah Pembayaran
-                                            </a></li>
-                                            @endif
-                                            <li><a class="dropdown-item" href="{{ route('payments.index', $workOrder->id) }}">
-                                                <i class="fas fa-list me-2"></i>Riwayat Pembayaran
-                                            </a></li>
-                                            @if($workOrder->status != 'completed' && $workOrder->status != 'cancelled')
-                                            <li><hr class="dropdown-divider"></li>
-                                            <li>
-                                                <form action="{{ route('work-orders.update-status', $workOrder->id) }}" method="POST" class="d-inline">
-                                                    @csrf
-                                                    @method('PATCH')
-                                                    <input type="hidden" name="status" value="in_progress">
-                                                    <button type="submit" class="dropdown-item" 
-                                                            onclick="return confirm('Ubah status ke Dalam Proses?')"
-                                                            @if($workOrder->status == 'in_progress') disabled @endif>
-                                                        <i class="fas fa-play me-2"></i>Mulai Proses
-                                                    </button>
-                                                </form>
-                                            </li>
-                                            <li>
-                                                <form action="{{ route('work-orders.update-status', $workOrder->id) }}" method="POST" class="d-inline">
-                                                    @csrf
-                                                    @method('PATCH')
-                                                    <input type="hidden" name="status" value="completed">
-                                                    <button type="submit" class="dropdown-item" 
-                                                            onclick="return confirm('Tandai sebagai Selesai?')"
-                                                            @if($workOrder->status == 'completed') disabled @endif>
-                                                        <i class="fas fa-check me-2"></i>Selesai
-                                                    </button>
-                                                </form>
-                                            </li>
-                                            @endif
-                                            @if($workOrder->status == 'pending')
-                                            <li><hr class="dropdown-divider"></li>
-                                            <li>
-                                                <form action="{{ route('work-orders.destroy', $workOrder->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Apakah Anda yakin ingin menghapus work order ini?')">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="dropdown-item text-danger">
-                                                        <i class="fas fa-trash me-2"></i>Hapus
-                                                    </button>
-                                                </form>
-                                            </li>
+                                            @if(Auth::user()->role !== 'customer')
+                                                @if($workOrder->remaining_balance > 0)
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li><a class="dropdown-item" href="{{ route('payments.create', $workOrder->id) }}">
+                                                    <i class="fas fa-money-bill-wave me-2"></i>Tambah Pembayaran
+                                                </a></li>
+                                                @endif
+                                                <li><a class="dropdown-item" href="{{ route('payments.index', $workOrder->id) }}">
+                                                    <i class="fas fa-list me-2"></i>Riwayat Pembayaran
+                                                </a></li>
+                                                @if($workOrder->status != 'completed' && $workOrder->status != 'cancelled')
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li>
+                                                    <form action="{{ route('work-orders.update-status', $workOrder->id) }}" method="POST" class="d-inline">
+                                                        @csrf
+                                                        @method('PATCH')
+                                                        <input type="hidden" name="status" value="in_progress">
+                                                        <button type="submit" class="dropdown-item" 
+                                                                onclick="return confirm('Ubah status ke Dalam Proses?')"
+                                                                @if($workOrder->status == 'in_progress') disabled @endif>
+                                                            <i class="fas fa-play me-2"></i>Mulai Proses
+                                                        </button>
+                                                    </form>
+                                                </li>
+                                                <li>
+                                                    <form action="{{ route('work-orders.update-status', $workOrder->id) }}" method="POST" class="d-inline">
+                                                        @csrf
+                                                        @method('PATCH')
+                                                        <input type="hidden" name="status" value="completed">
+                                                        <button type="submit" class="dropdown-item" 
+                                                                onclick="return confirm('Tandai sebagai Selesai?')"
+                                                                @if($workOrder->status == 'completed') disabled @endif>
+                                                            <i class="fas fa-check me-2"></i>Selesai
+                                                        </button>
+                                                    </form>
+                                                </li>
+                                                @endif
+                                                @if($workOrder->status == 'pending')
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li>
+                                                    <form action="{{ route('work-orders.destroy', $workOrder->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Apakah Anda yakin ingin menghapus work order ini?')">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="submit" class="dropdown-item text-danger">
+                                                            <i class="fas fa-trash me-2"></i>Hapus
+                                                        </button>
+                                                    </form>
+                                                </li>
+                                                @endif
+                                            @else
+                                                <li><a class="dropdown-item" href="{{ route('payments.index', $workOrder->id) }}">
+                                                    <i class="fas fa-list me-2"></i>Riwayat Pembayaran
+                                                </a></li>
                                             @endif
                                         </ul>
                                     </div>
@@ -289,17 +307,21 @@
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="10" class="text-center">
+                            <td colspan="{{ Auth::user()->role === 'customer' ? '9' : '10' }}" class="text-center">
                                 <div class="py-4">
                                     <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
                                     <p class="text-muted">
                                         @if(request()->hasAny(['search', 'status', 'payment_status', 'mechanic_id', 'start_date', 'end_date']))
                                             Tidak ada work order yang sesuai dengan filter
                                         @else
-                                            Belum ada work order
+                                            @if(Auth::user()->role === 'customer')
+                                                Anda belum memiliki work order
+                                            @else
+                                                Belum ada work order
+                                            @endif
                                         @endif
                                     </p>
-                                    @if(!request()->hasAny(['search', 'status', 'payment_status', 'mechanic_id', 'start_date', 'end_date']))
+                                    @if(Auth::user()->role !== 'customer' && !request()->hasAny(['search', 'status', 'payment_status', 'mechanic_id', 'start_date', 'end_date']))
                                     <a href="{{ route('work-orders.create') }}" class="btn btn-primary">
                                         <i class="fas fa-plus me-1"></i> Buat Work Order Pertama
                                     </a>
@@ -323,8 +345,8 @@
             </div>
             @endif
 
-            {{-- Statistics Summary - Fixed to work properly with pagination --}}
-            @if($workOrders->count() > 0)
+            {{-- Statistics Summary - Only show for non-customer users --}}
+            @if(Auth::user()->role !== 'customer' && $workOrders->count() > 0)
             <div class="mt-3">
                 <div class="row text-center">
                     <div class="col-md-3">
@@ -430,7 +452,8 @@
             responsive: true
         });
 
-        // Auto submit form on filter change
+        @if(Auth::user()->role !== 'customer')
+        // Auto submit form on filter change (only for non-customer users)
         $('#status, #payment_status, #mechanic_id, #sort_by, #sort_direction').change(function() {
             $('#filterForm').submit();
         });
@@ -439,6 +462,7 @@
         $('#clearFilters').click(function() {
             window.location.href = "{{ route('work-orders.index') }}";
         });
+        @endif
     });
 </script>
 @endsection

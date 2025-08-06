@@ -414,49 +414,48 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {{ request()->is('services*') ? 'active' : '' }}"
-                        href="{{ route('services.index') }}">
-                        <i class="fas fa-tools"></i>
-                        <span>Layanan Servis</span>
+                    <a class="nav-link {{ request()->is('work-orders*') ? 'active' : '' }}"
+                        href="{{ route('work-orders.index') }}">
+                        <i class="fas fa-clipboard-list"></i>
+                        <span>Work Order</span>
                     </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link {{ request()->is('payments*') ? 'active' : '' }}"
-                        href="{{ route('payments.index') }}">
-                        <i class="fas fa-credit-card"></i>
-                        <span>Pembayaran</span>
-                    </a>
-                </li>
 
-                @if(auth()->user()->isAdmin())
-                    <!-- Admin Only Routes -->
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->is('users*') ? 'active' : '' }}" href="{{ route('users.index') }}">
-                            <i class="fas fa-users"></i>
-                            <span>Manajemen User</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->is('parts*') ? 'active' : '' }}" href="{{ route('parts.index') }}">
-                            <i class="fas fa-cogs"></i>
-                            <span>Inventaris Spare Part</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->is('service-categories*') ? 'active' : '' }}"
-                            href="{{ route('service-categories.index') }}">
-                            <i class="fas fa-list"></i>
-                            <span>Kategori Servis</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->is('inventory-transactions*') ? 'active' : '' }}"
-                            href="{{ route('inventory-transactions.index') }}">
-                            <i class="fas fa-exchange-alt"></i>
-                            <span>Transaksi Inventaris</span>
-                        </a>
-                    </li>
-                @endif
+                    @if(auth()->user()->isAdmin())
+                            <!-- Admin Only Routes -->
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->is('services*') ? 'active' : '' }}"
+                                href="{{ route('services.index') }}">
+                                <i class="fas fa-tools"></i>
+                                <span>Layanan Servis</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->is('users*') ? 'active' : '' }}" href="{{ route('users.index') }}">
+                                <i class="fas fa-users"></i>
+                                <span>Manajemen User</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->is('parts*') ? 'active' : '' }}" href="{{ route('parts.index') }}">
+                                <i class="fas fa-cogs"></i>
+                                <span>Inventaris Spare Part</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->is('service-categories*') ? 'active' : '' }}"
+                                href="{{ route('service-categories.index') }}">
+                                <i class="fas fa-list"></i>
+                                <span>Kategori Servis</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->is('inventory-transactions*') ? 'active' : '' }}"
+                                href="{{ route('inventory-transactions.index') }}">
+                                <i class="fas fa-exchange-alt"></i>
+                                <span>Transaksi Inventaris</span>
+                            </a>
+                        </li>
+                    @endif
 
                 @if(auth()->user()->isMechanic())
                     <!-- Mechanic Only Routes -->

@@ -72,7 +72,7 @@
                         <i class="fas fa-plus me-1"></i> Tambah Pembayaran
                     </a>
                     @endif
-                    <a href="{{ route('work-orders.show', $workOrder) }}" class="btn btn-secondary btn-sm">
+                    <a href="{{ route('work-orders.index', $workOrder) }}" class="btn btn-secondary btn-sm">
                         <i class="fas fa-arrow-left me-1"></i> Kembali ke Work Order
                     </a>
                 </div>

@@ -80,10 +80,10 @@
                 </div>
                 <div>
                     <div class="btn-group" role="group">
-                        <a href="{{ route('inventory-transactions.report') }}" class="btn btn-info btn-sm">
+                        <a href="{{ route('inventory_transactions.report') }}" class="btn btn-info btn-sm">
                             <i class="fas fa-chart-bar me-1"></i> Laporan Stok
                         </a>
-                        <a href="{{ route('inventory-transactions.movement') }}" class="btn btn-secondary btn-sm">
+                        <a href="{{ route('inventory_transactions.movement') }}" class="btn btn-secondary btn-sm">
                             <i class="fas fa-list me-1"></i> Laporan Pergerakan
                         </a>
                         <a href="{{ route('inventory-transactions.create') }}" class="btn btn-primary btn-sm">

@@ -35,9 +35,11 @@
                             </h5>
                         </div>
                         <div class="btn-group" role="group">
+                            @if(Auth::user()->role !== 'customer')
                             <a href="{{ route('work-orders.edit', $workOrder->id) }}" class="btn btn-warning btn-sm">
                                 <i class="fas fa-edit me-1"></i> Edit
                             </a>
+                            @endif
                             <a href="{{ route('work-orders.invoice', $workOrder->id) }}" class="btn btn-info btn-sm">
                                 <i class="fas fa-file-invoice me-1"></i> Invoice
                             </a>
@@ -101,25 +103,55 @@
                         <div class="col-md-6">
                             <div class="d-flex justify-content-end">
                                 <div class="text-end">
-                                    @if($workOrder->status != 'completed' && $workOrder->status != 'cancelled')
-                                    <form action="{{ route('work-orders.update-status', $workOrder->id) }}" method="POST" class="d-inline">
-                                        @csrf
-                                        @method('PATCH')
+                                    @if(Auth::user()->role !== 'customer')
+                                        {{-- Admin/Staff can change status --}}
+                                        @if($workOrder->status != 'completed' && $workOrder->status != 'cancelled')
+                                        <form action="{{ route('work-orders.update-status', $workOrder->id) }}" method="POST" class="d-inline">
+                                            @csrf
+                                            @method('PATCH')
+                                            <div class="mb-2">
+                                                <label for="status" class="form-label small">Ubah Status:</label>
+                                                <select name="status" id="status" class="form-select form-select-sm" onchange="this.form.submit()">
+                                                    <option value="pending" {{ $workOrder->status == 'pending' ? 'selected' : '' }}>Pending</option>
+                                                    <option value="in_progress" {{ $workOrder->status == 'in_progress' ? 'selected' : '' }}>In Progress</option>
+                                                    <option value="completed" {{ $workOrder->status == 'completed' ? 'selected' : '' }}>Completed</option>
+                                                    <option value="cancelled" {{ $workOrder->status == 'cancelled' ? 'selected' : '' }}>Cancelled</option>
+                                                </select>
+                                            </div>
+                                        </form>
+                                        @endif
+                                        
+                                        @if($workOrder->payment_status != 'paid' && $workOrder->status != 'cancelled')
+                                        <a href="{{ route('work-orders.create-payment', $workOrder->id) }}" class="btn btn-success btn-sm">
+                                            <i class="fas fa-money-bill me-1"></i> Tambah Pembayaran
+                                        </a>
+                                        @endif
+                                    @else
+                                        {{-- Customer can only add payment if work order is completed --}}
+                                        @if($workOrder->status == 'completed' && $workOrder->payment_status != 'paid')
                                         <div class="mb-2">
-                                            <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
-                                                <option value="pending" {{ $workOrder->status == 'pending' ? 'selected' : '' }}>Pending</option>
-                                                <option value="in_progress" {{ $workOrder->status == 'in_progress' ? 'selected' : '' }}>In Progress</option>
-                                                <option value="completed" {{ $workOrder->status == 'completed' ? 'selected' : '' }}>Completed</option>
-                                                <option value="cancelled" {{ $workOrder->status == 'cancelled' ? 'selected' : '' }}>Cancelled</option>
-                                            </select>
+                                            <small class="text-muted d-block">Pekerjaan telah selesai, silakan lakukan pembayaran:</small>
                                         </div>
-                                    </form>
-                                    @endif
-                                    
-                                    @if($workOrder->payment_status != 'paid' && $workOrder->status != 'cancelled')
-                                    <a href="{{ route('work-orders.create-payment', $workOrder->id) }}" class="btn btn-success btn-sm">
-                                        <i class="fas fa-money-bill me-1"></i> Tambah Pembayaran
-                                    </a>
+                                        <a href="{{ route('work-orders.create-payment', $workOrder->id) }}" class="btn btn-success btn-sm">
+                                            <i class="fas fa-money-bill me-1"></i> Bayar Sekarang
+                                        </a>
+                                        @elseif($workOrder->status == 'completed' && $workOrder->payment_status == 'paid')
+                                        <div class="alert alert-success mb-0 py-2 px-3">
+                                            <small><i class="fas fa-check-circle me-1"></i> Pekerjaan selesai dan sudah lunas</small>
+                                        </div>
+                                        @elseif($workOrder->status == 'pending')
+                                        <div class="alert alert-info mb-0 py-2 px-3">
+                                            <small><i class="fas fa-clock me-1"></i> Menunggu dikerjakan oleh mekanik</small>
+                                        </div>
+                                        @elseif($workOrder->status == 'in_progress')
+                                        <div class="alert alert-warning mb-0 py-2 px-3">
+                                            <small><i class="fas fa-tools me-1"></i> Sedang dalam proses pengerjaan</small>
+                                        </div>
+                                        @elseif($workOrder->status == 'cancelled')
+                                        <div class="alert alert-danger mb-0 py-2 px-3">
+                                            <small><i class="fas fa-times-circle me-1"></i> Work order dibatalkan</small>
+                                        </div>
+                                        @endif
                                     @endif
                                 </div>
                             </div>
@@ -204,7 +236,7 @@
                             <p class="mb-0">{{ $workOrder->mechanic->name ?? '-' }}</p>
                         </div>
                         
-                        @if($workOrder->appointment)
+                        @if($workOrder->appointment && Auth::user()->role !== 'customer')
                         <div class="col-12 mb-3">
                             <h6 class="text-primary">Appointment</h6>
                             <p class="mb-0">
@@ -243,7 +275,9 @@
                                     <th>Quantity</th>
                                     <th>Harga Satuan</th>
                                     <th>Total</th>
+                                    @if(Auth::user()->role !== 'customer')
                                     <th>Catatan</th>
+                                    @endif
                                 </tr>
                             </thead>
                             <tbody>
@@ -254,15 +288,19 @@
                                     <td>{{ $workOrderService->quantity }}</td>
                                     <td>Rp {{ number_format($workOrderService->price, 0, ',', '.') }}</td>
                                     <td>Rp {{ number_format($workOrderService->quantity * $workOrderService->price, 0, ',', '.') }}</td>
+                                    @if(Auth::user()->role !== 'customer')
                                     <td>{{ $workOrderService->notes ?? '-' }}</td>
+                                    @endif
                                 </tr>
                                 @endforeach
                             </tbody>
                             <tfoot>
                                 <tr class="table-light">
-                                    <th colspan="4" class="text-end">Total Layanan:</th>
+                                    <th colspan="{{ Auth::user()->role === 'customer' ? '4' : '5' }}" class="text-end">Total Layanan:</th>
                                     <th>Rp {{ number_format($workOrder->services->sum(function($s) { return $s->quantity * $s->price; }), 0, ',', '.') }}</th>
+                                    @if(Auth::user()->role !== 'customer')
                                     <th></th>
+                                    @endif
                                 </tr>
                             </tfoot>
                         </table>
@@ -288,7 +326,9 @@
                                 <tr>
                                     <th>No</th>
                                     <th>Nama Part</th>
+                                    @if(Auth::user()->role !== 'customer')
                                     <th>Kode Part</th>
+                                    @endif
                                     <th>Quantity</th>
                                     <th>Harga Satuan</th>
                                     <th>Total</th>
@@ -299,7 +339,9 @@
                                 <tr>
                                     <td>{{ $index + 1 }}</td>
                                     <td>{{ $workOrderPart->part->name }}</td>
+                                    @if(Auth::user()->role !== 'customer')
                                     <td>{{ $workOrderPart->part->part_code ?? '-' }}</td>
+                                    @endif
                                     <td>{{ $workOrderPart->quantity }}</td>
                                     <td>Rp {{ number_format($workOrderPart->price, 0, ',', '.') }}</td>
                                     <td>Rp {{ number_format($workOrderPart->quantity * $workOrderPart->price, 0, ',', '.') }}</td>
@@ -308,7 +350,7 @@
                             </tbody>
                             <tfoot>
                                 <tr class="table-light">
-                                    <th colspan="5" class="text-end">Total Parts:</th>
+                                    <th colspan="{{ Auth::user()->role === 'customer' ? '4' : '5' }}" class="text-end">Total Parts:</th>
                                     <th>Rp {{ number_format($workOrder->parts->sum(function($p) { return $p->quantity * $p->price; }), 0, ',', '.') }}</th>
                                 </tr>
                             </tfoot>
@@ -337,8 +379,10 @@
                                     <th>Tanggal</th>
                                     <th>Jumlah</th>
                                     <th>Metode</th>
+                                    @if(Auth::user()->role !== 'customer')
                                     <th>Referensi</th>
                                     <th>Catatan</th>
+                                    @endif
                                 </tr>
                             </thead>
                             <tbody>
@@ -360,8 +404,10 @@
                                             <span class="badge bg-secondary">Lainnya</span>
                                         @endif
                                     </td>
+                                    @if(Auth::user()->role !== 'customer')
                                     <td>{{ $payment->reference_number ?? '-' }}</td>
                                     <td>{{ $payment->notes ?? '-' }}</td>
+                                    @endif
                                 </tr>
                                 @endforeach
                             </tbody>
@@ -424,7 +470,7 @@
 
 @section('scripts')
 <script>
-    // Auto-submit form when status changes
+    // Auto-submit form when status changes (only for admin/staff)
     document.addEventListener('DOMContentLoaded', function() {
         const statusSelect = document.querySelector('select[name="status"]');
         if (statusSelect) {

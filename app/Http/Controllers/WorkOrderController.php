@@ -16,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 
 class WorkOrderController extends Controller
 {
@@ -28,6 +29,11 @@ class WorkOrderController extends Controller
     public function index(Request $request)
     {
         $query = WorkOrder::with(['vehicle', 'mechanic', 'appointment', 'customer']);
+
+        // Filter by customer if user is a customer
+        if (Auth::user()->role === 'customer') {
+            $query->where('customer_id', Auth::id());
+        }
 
         // Filter by status if provided
         if ($request->has('status') && $request->status) {
@@ -273,7 +279,7 @@ class WorkOrderController extends Controller
         } catch (\Exception $e) {
             DB::rollback();
 
-            \Log::error('Error creating work order: ' . $e->getMessage(), [
+            Log::error('Error creating work order: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
                 'request_data' => $request->all()
             ]);
@@ -306,7 +312,7 @@ class WorkOrderController extends Controller
 
             return view('work_orders.show', compact('workOrder'));
         } catch (\Exception $e) {
-            \Log::error('Error loading work order: ' . $e->getMessage(), [
+            Log::error('Error loading work order: ' . $e->getMessage(), [
                 'work_order_id' => $workOrder->id ?? 'unknown'
             ]);
 

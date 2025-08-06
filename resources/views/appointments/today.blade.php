@@ -28,9 +28,11 @@
                     <a href="{{ route('appointments.index') }}" class="btn btn-secondary btn-sm me-2">
                         <i class="fas fa-calendar-alt me-1"></i> Semua Janji
                     </a>
-                    <a href="{{ route('service-schedules.index') }}" class="btn btn-secondary btn-sm">
-                        <i class="fas fa-plus me-1"></i> Tambah Jadwal Layanan
-                    </a>
+                    @if(auth()->user()->role !== 'customer')
+<a href="{{ route('service-schedules.index') }}" class="btn btn-secondary btn-sm">
+    <i class="fas fa-plus me-1"></i> Tambah Jadwal Layanan
+</a>
+@endif
                 </div>
             </div>
         </div>

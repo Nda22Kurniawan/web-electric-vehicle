@@ -21,6 +21,7 @@
                 <div>
                     <i class="fas fa-tags me-1"></i>
                     Daftar Kategori Layanan
+                    <small class="text-muted">({{ $categories->total() }} kategori)</small>
                 </div>
                 <a href="{{ route('service-categories.create') }}" class="btn btn-primary btn-sm">
                     <i class="fas fa-plus me-1"></i> Tambah Kategori
@@ -29,35 +30,38 @@
         </div>
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-bordered table-hover" id="categoriesTable" width="100%" cellspacing="0">
+                <table class="table table-bordered table-hover" width="100%" cellspacing="0">
                     <thead>
                         <tr>
-                            <th>No</th>
-                            <th>Nama Kategori</th>
-                            <th>Deskripsi</th>
-                            <th>Jumlah Layanan</th>
-                            <th>Dibuat</th>
-                            <th>Aksi</th>
+                            <th width="8%">No</th>
+                            <th width="25%">Nama Kategori</th>
+                            <th width="35%">Deskripsi</th>
+                            <th width="15%">Jumlah Layanan</th>
+                            <th width="12%">Dibuat</th>
+                            <th width="15%">Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse($categories as $index => $category)
                         <tr>
-                            <td>{{ $categories->firstItem() + $index }}</td>
+                            <td>{{ ($categories->currentPage() - 1) * $categories->perPage() + $loop->iteration }}</td>
                             <td>
                                 <strong>{{ $category->name }}</strong>
                             </td>
                             <td>{{ $category->description ?: '-' }}</td>
                             <td>
-                                @if($category->services_count ?? 0 > 0)
-                                    <span class="badge bg-info">{{ $category->services_count ?? 0 }} layanan</span>
+                                @php
+                                    $servicesCount = $category->services()->count();
+                                @endphp
+                                @if($servicesCount > 0)
+                                    <span class="badge bg-info">{{ $servicesCount }} layanan</span>
                                 @else
                                     <span class="text-muted">Belum ada layanan</span>
                                 @endif
                             </td>
                             <td>
                                 <small class="text-muted">
-                                    {{ $category->created_at->format('d/m/Y H:i') }}
+                                    {{ $category->created_at->format('d/m/Y') }}
                                 </small>
                             </td>
                             <td>
@@ -96,9 +100,89 @@
                 </table>
             </div>
             
-            <div class="d-flex justify-content-center mt-3">
-                {{ $categories->links() }}
+            <!-- Custom Pagination -->
+            @if($categories->hasPages())
+            <div class="d-flex justify-content-between align-items-center mt-4">
+                <div class="text-muted">
+                    Menampilkan {{ $categories->firstItem() }} sampai {{ $categories->lastItem() }} dari {{ $categories->total() }} kategori
+                </div>
+                
+                <nav aria-label="Page navigation">
+                    <ul class="pagination pagination-sm mb-0">
+                        {{-- Previous Button --}}
+                        @if($categories->onFirstPage())
+                            <li class="page-item disabled">
+                                <span class="page-link">
+                                    <i class="fas fa-chevron-left"></i> Previous
+                                </span>
+                            </li>
+                        @else
+                            <li class="page-item">
+                                <a class="page-link" href="{{ $categories->previousPageUrl() }}">
+                                    <i class="fas fa-chevron-left"></i> Previous
+                                </a>
+                            </li>
+                        @endif
+
+                        {{-- Page Numbers --}}
+                        @php
+                            $start = max($categories->currentPage() - 2, 1);
+                            $end = min($start + 4, $categories->lastPage());
+                            $start = max($end - 4, 1);
+                        @endphp
+
+                        @if($start > 1)
+                            <li class="page-item">
+                                <a class="page-link" href="{{ $categories->url(1) }}">1</a>
+                            </li>
+                            @if($start > 2)
+                                <li class="page-item disabled">
+                                    <span class="page-link">...</span>
+                                </li>
+                            @endif
+                        @endif
+
+                        @for($i = $start; $i <= $end; $i++)
+                            @if($i == $categories->currentPage())
+                                <li class="page-item active">
+                                    <span class="page-link">{{ $i }}</span>
+                                </li>
+                            @else
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ $categories->url($i) }}">{{ $i }}</a>
+                                </li>
+                            @endif
+                        @endfor
+
+                        @if($end < $categories->lastPage())
+                            @if($end < $categories->lastPage() - 1)
+                                <li class="page-item disabled">
+                                    <span class="page-link">...</span>
+                                </li>
+                            @endif
+                            <li class="page-item">
+                                <a class="page-link" href="{{ $categories->url($categories->lastPage()) }}">{{ $categories->lastPage() }}</a>
+                            </li>
+                        @endif
+
+                        {{-- Next Button --}}
+                        @if($categories->hasMorePages())
+                            <li class="page-item">
+                                <a class="page-link" href="{{ $categories->nextPageUrl() }}">
+                                    Next <i class="fas fa-chevron-right"></i>
+                                </a>
+                            </li>
+                        @else
+                            <li class="page-item disabled">
+                                <span class="page-link">
+                                    Next <i class="fas fa-chevron-right"></i>
+                                </span>
+                            </li>
+                        @endif
+                    </ul>
+                </nav>
             </div>
+            @endif
         </div>
     </div>
     
@@ -110,7 +194,7 @@
                     <div class="d-flex justify-content-between">
                         <div>
                             <div class="small text-white-50">Total Kategori</div>
-                            <div class="h5">{{ $categories->total() }}</div>
+                            <div class="h5">{{ App\Models\ServiceCategory::count() }}</div>
                         </div>
                         <div class="align-self-center">
                             <i class="fas fa-tags fa-2x"></i>
@@ -125,7 +209,7 @@
                     <div class="d-flex justify-content-between">
                         <div>
                             <div class="small text-white-50">Kategori Aktif</div>
-                            <div class="h5">{{ $categories->where('services_count', '>', 0)->count() }}</div>
+                            <div class="h5">{{ App\Models\ServiceCategory::has('services')->count() }}</div>
                         </div>
                         <div class="align-self-center">
                             <i class="fas fa-check-circle fa-2x"></i>
@@ -140,7 +224,7 @@
                     <div class="d-flex justify-content-between">
                         <div>
                             <div class="small text-white-50">Kategori Kosong</div>
-                            <div class="h5">{{ $categories->where('services_count', 0)->count() }}</div>
+                            <div class="h5">{{ App\Models\ServiceCategory::doesntHave('services')->count() }}</div>
                         </div>
                         <div class="align-self-center">
                             <i class="fas fa-exclamation-triangle fa-2x"></i>
@@ -192,18 +276,6 @@
 @section('scripts')
 <script>
     $(document).ready(function() {
-        // Initialize DataTable with minimal configuration
-        $('#categoriesTable').DataTable({
-            paging: false,
-            info: false,
-            searching: true,
-            ordering: true,
-            responsive: true,
-            columnDefs: [
-                { orderable: false, targets: [5] } // Disable sorting on action column
-            ]
-        });
-        
         // Auto hide success alert after 5 seconds
         setTimeout(function() {
             $('.alert-success').fadeOut('slow');

@@ -99,6 +99,7 @@
                                     <div class="d-flex justify-content-between">
                                         <div>
                                             <h6>{{ $appointment->vehicle->brand }}</h6>
+                                            <p class="mb-1"><strong>Model:</strong> {{ $appointment->vehicle->model }}</p>
                                             <p class="mb-1"><strong>Tipe:</strong> {{ $appointment->vehicle->type }}</p>
                                             <p class="mb-1"><strong>Tahun:</strong> {{ $appointment->vehicle->year ?? '-' }}</p>
                                             <p class="mb-0"><strong>No. Polisi:</strong> {{ $appointment->vehicle->license_plate ?? '-' }}</p>
@@ -147,15 +148,27 @@
                             <i class="fas fa-arrow-left me-1"></i> Kembali
                         </a>
                         <div>
-                            @if($appointment->status != 'completed' && $appointment->status != 'cancelled')
-                                <a href="{{ route('appointments.edit', $appointment->id) }}" class="btn btn-warning me-2">
-                                    <i class="fas fa-edit me-1"></i> Edit
-                                </a>
-                                
-                                @if(auth()->user()->can('update appointments'))
-                                <button class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#statusModal">
-                                    <i class="fas fa-sync-alt me-1"></i> Ubah Status
-                                </button>
+                            {{-- Customer hanya bisa edit jika status masih pending --}}
+                            @if(auth()->user()->role === 'customer')
+                                @if($appointment->status == 'pending')
+                                    <a href="{{ route('appointments.edit', $appointment->id) }}" class="btn btn-warning me-2">
+                                        <i class="fas fa-edit me-1"></i> Edit
+                                    </a>
+                                @else
+                                    <span class="text-muted small">Janji tidak dapat diubah setelah dikonfirmasi</span>
+                                @endif
+                            @else
+                                {{-- Admin/Owner tetap bisa edit selama tidak completed/cancelled --}}
+                                @if($appointment->status != 'completed' && $appointment->status != 'cancelled')
+                                    <a href="{{ route('appointments.edit', $appointment->id) }}" class="btn btn-warning me-2">
+                                        <i class="fas fa-edit me-1"></i> Edit
+                                    </a>
+                                    
+                                    @if(auth()->user()->can('update appointments'))
+                                    <button class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#statusModal">
+                                        <i class="fas fa-sync-alt me-1"></i> Ubah Status
+                                    </button>
+                                    @endif
                                 @endif
                             @endif
                             
@@ -228,55 +241,106 @@
                 </div>
             </div>
             
-            <!-- Action Card -->
+            <!-- Action Card - Hanya untuk Admin/Owner -->
+            @if(auth()->user()->role !== 'customer')
             <div class="card mb-4">
-    <div class="card-header">
-        <i class="fas fa-bolt me-1"></i>
-        Aksi Cepat
-    </div>
-    <div class="card-body">
-        <div class="d-grid gap-2">
-            @if($appointment->status == 'pending')
-            <form action="{{ route('appointments.update-status', $appointment->id) }}" method="POST">
-                @csrf
-                @method('PUT')
-                <input type="hidden" name="status" value="confirmed">
-                <button type="submit" class="btn btn-success w-100 mb-2" onclick="return confirm('Konfirmasi janji ini?')">
-                    <i class="fas fa-check-circle me-1"></i> Konfirmasi Janji
-                </button>
-            </form>
+                <div class="card-header">
+                    <i class="fas fa-bolt me-1"></i>
+                    Aksi Cepat
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        @if($appointment->status == 'pending')
+                        <form action="{{ route('appointments.update-status', $appointment->id) }}" method="POST">
+                            @csrf
+                            @method('PUT')
+                            <input type="hidden" name="status" value="confirmed">
+                            <button type="submit" class="btn btn-success w-100 mb-2" onclick="return confirm('Konfirmasi janji ini?')">
+                                <i class="fas fa-check-circle me-1"></i> Konfirmasi Janji
+                            </button>
+                        </form>
+                        @endif
+                        
+                        @if($appointment->status == 'confirmed')
+                        <form action="{{ route('appointments.update-status', $appointment->id) }}" method="POST">
+                            @csrf
+                            @method('PUT')
+                            <input type="hidden" name="status" value="in_progress">
+                            <button type="submit" class="btn btn-info w-100 mb-2" onclick="return confirm('Mulai proses servis?')">
+                                <i class="fas fa-play-circle me-1"></i> Mulai Servis
+                            </button>
+                        </form>
+                        @endif
+                        
+                        @if($appointment->status == 'in_progress')
+                        <form action="{{ route('appointments.update-status', $appointment->id) }}" method="POST">
+                            @csrf
+                            @method('PUT')
+                            <input type="hidden" name="status" value="completed">
+                            <button type="submit" class="btn btn-success w-100 mb-2" onclick="return confirm('Selesaikan servis ini?')">
+                                <i class="fas fa-check-double me-1"></i> Selesaikan Servis
+                            </button>
+                        </form>
+                        @endif
+                        
+                        @if($appointment->status != 'completed' && $appointment->status != 'cancelled')
+                        <button class="btn btn-danger w-100" data-bs-toggle="modal" data-bs-target="#cancelModal">
+                            <i class="fas fa-times-circle me-1"></i> Batalkan Janji
+                        </button>
+                        @endif
+                    </div>
+                </div>
+            </div>
+            @else
+            <!-- Status Info Card untuk Customer -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Status Janji
+                </div>
+                <div class="card-body">
+                    <div class="text-center">
+                        @switch($appointment->status)
+                            @case('pending')
+                                <div class="mb-3">
+                                    <i class="fas fa-clock fa-3x text-warning"></i>
+                                </div>
+                                <h5 class="text-warning">Menunggu Konfirmasi</h5>
+                                <p class="small text-muted">Janji Anda sedang menunggu konfirmasi dari tim kami</p>
+                                @break
+                            @case('confirmed')
+                                <div class="mb-3">
+                                    <i class="fas fa-check-circle fa-3x text-primary"></i>
+                                </div>
+                                <h5 class="text-primary">Dikonfirmasi</h5>
+                                <p class="small text-muted">Janji Anda telah dikonfirmasi. Harap datang tepat waktu</p>
+                                @break
+                            @case('in_progress')
+                                <div class="mb-3">
+                                    <i class="fas fa-tools fa-3x text-info"></i>
+                                </div>
+                                <h5 class="text-info">Dalam Proses</h5>
+                                <p class="small text-muted">Kendaraan Anda sedang dalam proses servis</p>
+                                @break
+                            @case('completed')
+                                <div class="mb-3">
+                                    <i class="fas fa-check-double fa-3x text-success"></i>
+                                </div>
+                                <h5 class="text-success">Selesai</h5>
+                                <p class="small text-muted">Servis kendaraan Anda telah selesai</p>
+                                @break
+                            @case('cancelled')
+                                <div class="mb-3">
+                                    <i class="fas fa-times-circle fa-3x text-danger"></i>
+                                </div>
+                                <h5 class="text-danger">Dibatalkan</h5>
+                                <p class="small text-muted">Janji servis telah dibatalkan</p>
+                                @break
+                        @endswitch
+                    </div>
+                </div>
+            </div>
             @endif
-            
-            @if($appointment->status == 'confirmed')
-            <form action="{{ route('appointments.update-status', $appointment->id) }}" method="POST">
-                @csrf
-                @method('PUT')
-                <input type="hidden" name="status" value="in_progress">
-                <button type="submit" class="btn btn-info w-100 mb-2" onclick="return confirm('Mulai proses servis?')">
-                    <i class="fas fa-play-circle me-1"></i> Mulai Servis
-                </button>
-            </form>
-            @endif
-            
-            @if($appointment->status == 'in_progress')
-            <form action="{{ route('appointments.update-status', $appointment->id) }}" method="POST">
-                @csrf
-                @method('PUT')
-                <input type="hidden" name="status" value="completed">
-                <button type="submit" class="btn btn-success w-100 mb-2" onclick="return confirm('Selesaikan servis ini?')">
-                    <i class="fas fa-check-double me-1"></i> Selesaikan Servis
-                </button>
-            </form>
-            @endif
-            
-            @if($appointment->status != 'completed' && $appointment->status != 'cancelled')
-            <button class="btn btn-danger w-100" data-bs-toggle="modal" data-bs-target="#cancelModal">
-                <i class="fas fa-times-circle me-1"></i> Batalkan Janji
-            </button>
-            @endif
-        </div>
-    </div>
-</div>
             
             <!-- Notes Card -->
             <div class="card">
@@ -290,11 +354,14 @@
                     @else
                         <p class="text-muted">Tidak ada catatan tambahan.</p>
                     @endif
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
-<!-- Status Change Modal -->
+<!-- Status Change Modal - Hanya untuk Admin/Owner -->
+@if(auth()->user()->role !== 'customer')
 <div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -357,6 +424,8 @@
         </div>
     </div>
 </div>
+@endif
+
 @endsection
 
 @section('styles')

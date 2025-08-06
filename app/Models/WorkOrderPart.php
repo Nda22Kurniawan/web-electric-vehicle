@@ -74,14 +74,7 @@ class WorkOrderPart extends Model
         
         // Create inventory transaction when a part is added to work order
         static::created(function ($workOrderPart) {
-            // Create a sales inventory transaction
-            InventoryTransaction::create([
-                'part_id' => $workOrderPart->part_id,
-                'work_order_id' => $workOrderPart->work_order_id,
-                'quantity' => -$workOrderPart->quantity, // Negative for outgoing inventory
-                'transaction_type' => 'sales',
-                'notes' => 'Used in Work Order #' . $workOrderPart->workOrder->work_order_number,
-            ]);
+            
             
             // Update part stock
             $part = $workOrderPart->part;
@@ -102,7 +95,7 @@ class WorkOrderPart extends Model
                     'work_order_id' => $workOrderPart->work_order_id,
                     'quantity' => $difference, // Positive if decreasing quantity, negative if increasing
                     'transaction_type' => 'adjustment',
-                    'notes' => 'Adjusted in Work Order #' . $workOrderPart->workOrder->work_order_number,
+                    'notes' => 'Disesuaikan di Work Order #' . $workOrderPart->workOrder->work_order_number,
                 ]);
                 
                 // Update part stock
@@ -120,7 +113,7 @@ class WorkOrderPart extends Model
                 'work_order_id' => $workOrderPart->work_order_id,
                 'quantity' => $workOrderPart->quantity, // Positive for incoming inventory
                 'transaction_type' => 'return',
-                'notes' => 'Returned from Work Order #' . $workOrderPart->workOrder->work_order_number,
+                'notes' => 'Dikembalikan dari Work Order #' . $workOrderPart->workOrder->work_order_number,
             ]);
             
             // Update part stock

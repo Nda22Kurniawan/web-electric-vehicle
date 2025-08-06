@@ -15,12 +15,12 @@ class CustomerFeedbackController extends Controller
     public function index(Request $request)
     {
         $query = CustomerFeedback::with(['workOrder', 'customer']);
-        
+
         // Filter by rating
         if ($request->has('rating') && $request->rating) {
             $query->where('rating', $request->rating);
         }
-        
+
         // Filter by visibility
         if ($request->has('visibility')) {
             if ($request->visibility == 'public') {
@@ -29,18 +29,18 @@ class CustomerFeedbackController extends Controller
                 $query->where('is_public', false);
             }
         }
-        
+
         // Filter by date range
         if ($request->has('date_from') && $request->date_from) {
             $query->whereDate('created_at', '>=', $request->date_from);
         }
-        
+
         if ($request->has('date_to') && $request->date_to) {
             $query->whereDate('created_at', '<=', $request->date_to);
         }
-        
+
         $feedback = $query->orderBy('created_at', 'desc')->paginate(10);
-        
+
         return view('customer_feedback.index', compact('feedback'));
     }
 
@@ -49,8 +49,12 @@ class CustomerFeedbackController extends Controller
      */
     public function create(WorkOrder $workOrder = null)
     {
-        $customers = User::where('role', 'customer')->get(); // Assuming you have a role field
-        return view('customer_feedback.create', compact('workOrder', 'customers'));
+        $customers = User::where('role', 'customer')->get();
+        $workOrders = WorkOrder::where('status', 'completed')
+            ->select('id', 'work_order_number', 'diagnosis') // Add work_order_number to the selection
+            ->get();
+
+        return view('customer_feedback.create', compact('workOrder', 'customers', 'workOrders'));
     }
 
     /**
@@ -174,7 +178,7 @@ class CustomerFeedbackController extends Controller
         return redirect()->route('customer-feedback.index')
             ->with('success', 'Feedback berhasil dihapus.');
     }
-    
+
     /**
      * Show public feedback for testimonials page.
      */
@@ -185,10 +189,10 @@ class CustomerFeedbackController extends Controller
             ->where('rating', '>=', 4) // Only show good feedback (4-5 stars)
             ->latest()
             ->paginate(9);
-            
+
         return view('customer_feedback.testimonials', compact('testimonials'));
     }
-    
+
     /**
      * Show the public feedback form for customers.
      */
@@ -197,22 +201,22 @@ class CustomerFeedbackController extends Controller
         $workOrder = WorkOrder::whereHas('appointment', function ($query) use ($trackingCode) {
             $query->where('tracking_code', $trackingCode);
         })->where('status', 'completed')->first();
-        
+
         if (!$workOrder) {
             return redirect()->route('home')
                 ->with('error', 'Work order tidak ditemukan atau belum selesai.');
         }
-        
+
         // Check if feedback already exists
         $exists = CustomerFeedback::where('work_order_id', $workOrder->id)->exists();
         if ($exists) {
             return redirect()->route('home')
                 ->with('info', 'Anda sudah memberikan feedback untuk servis ini.');
         }
-        
+
         return view('customer_feedback.public_form', compact('workOrder', 'trackingCode'));
     }
-    
+
     /**
      * Store feedback from public form.
      */
@@ -221,12 +225,12 @@ class CustomerFeedbackController extends Controller
         $workOrder = WorkOrder::whereHas('appointment', function ($query) use ($trackingCode) {
             $query->where('tracking_code', $trackingCode);
         })->where('status', 'completed')->first();
-        
+
         if (!$workOrder) {
             return redirect()->route('home')
                 ->with('error', 'Work order tidak ditemukan atau belum selesai.');
         }
-        
+
         // Check if feedback already exists
         $exists = CustomerFeedback::where('work_order_id', $workOrder->id)->exists();
         if ($exists) {
@@ -240,7 +244,7 @@ class CustomerFeedbackController extends Controller
             'comment' => 'nullable|string',
             'is_public' => 'boolean',
         ]);
-        
+
         // Create feedback data for public form (no customer_id, only customer_name)
         $feedbackData = [
             'work_order_id' => $workOrder->id,
@@ -249,10 +253,10 @@ class CustomerFeedbackController extends Controller
             'comment' => $validated['comment'] ?? null,
             'is_public' => $validated['is_public'] ?? false,
         ];
-        
+
         // Create feedback
         CustomerFeedback::create($feedbackData);
-        
+
         return redirect()->route('home')
             ->with('success', 'Terima kasih atas feedback Anda!');
     }
@@ -292,7 +296,7 @@ class CustomerFeedbackController extends Controller
         ]);
 
         $status = $customerFeedback->is_public ? 'publik' : 'privat';
-        
+
         return redirect()->back()
             ->with('success', "Feedback berhasil diubah menjadi {$status}.");
     }

@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Auth;
 
 class VehicleController extends Controller
 {
@@ -17,7 +18,19 @@ class VehicleController extends Controller
      */
     public function index()
     {
-        $vehicles = Vehicle::with('customer')->latest()->paginate(10);
+        $user = Auth::user();
+        
+        // Jika user adalah customer, hanya tampilkan kendaraan milik customer tersebut
+        if ($user->role === 'customer') {
+            $vehicles = Vehicle::with('customer')
+                ->where('customer_id', $user->id)
+                ->latest()
+                ->paginate(10);
+        } else {
+            // Admin/Owner dapat melihat semua kendaraan
+            $vehicles = Vehicle::with('customer')->latest()->paginate(10);
+        }
+        
         return view('vehicles.index', compact('vehicles'));
     }
 
@@ -28,8 +41,16 @@ class VehicleController extends Controller
      */
     public function create()
     {
-        // Only get customers (users with role 'customer')
-        $customers = User::where('role', 'customer')->orderBy('name')->get();
+        $user = Auth::user();
+        
+        // Jika customer, otomatis pilih dirinya sendiri
+        if ($user->role === 'customer') {
+            $customers = collect([$user]); // Hanya dirinya sendiri
+        } else {
+            // Only get customers (users with role 'customer')
+            $customers = User::where('role', 'customer')->orderBy('name')->get();
+        }
+        
         return view('vehicles.create', compact('customers'));
     }
 
@@ -41,6 +62,13 @@ class VehicleController extends Controller
      */
     public function store(Request $request)
     {
+        $user = Auth::user();
+        
+        // Jika customer, paksa customer_id ke ID mereka sendiri
+        if ($user->role === 'customer') {
+            $request->merge(['customer_id' => $user->id]);
+        }
+        
         $validator = Validator::make($request->all(), [
             'customer_id' => 'required|exists:users,id',
             'type' => 'required|in:motorcycle,electric_bike',
@@ -53,11 +81,16 @@ class VehicleController extends Controller
         ]);
 
         // Additional validation for customer role
-        $validator->after(function ($validator) use ($request) {
+        $validator->after(function ($validator) use ($request, $user) {
             if ($request->customer_id) {
-                $user = User::find($request->customer_id);
-                if ($user && !$user->isCustomer()) {
+                $customer = User::find($request->customer_id);
+                if ($customer && !$customer->isCustomer()) {
                     $validator->errors()->add('customer_id', 'Pengguna yang dipilih harus memiliki role customer.');
+                }
+                
+                // Jika user adalah customer, pastikan mereka hanya bisa menambah untuk diri sendiri
+                if ($user->role === 'customer' && $request->customer_id != $user->id) {
+                    $validator->errors()->add('customer_id', 'Anda hanya dapat menambahkan kendaraan untuk diri sendiri.');
                 }
             }
         });
@@ -92,6 +125,13 @@ class VehicleController extends Controller
      */
     public function show(Vehicle $vehicle)
     {
+        $user = Auth::user();
+        
+        // Jika customer, pastikan mereka hanya bisa melihat kendaraan milik mereka
+        if ($user->role === 'customer' && $vehicle->customer_id !== $user->id) {
+            abort(403, 'Anda tidak memiliki akses ke kendaraan ini.');
+        }
+        
         $vehicle->load('customer', 'appointments', 'workOrders');
         return view('vehicles.show', compact('vehicle'));
     }
@@ -104,6 +144,13 @@ class VehicleController extends Controller
      */
     public function edit(Vehicle $vehicle)
     {
+        $user = Auth::user();
+        
+        // Customer tidak boleh edit kendaraan (hanya admin/owner)
+        if ($user->role === 'customer') {
+            abort(403, 'Anda tidak memiliki akses untuk mengedit kendaraan.');
+        }
+        
         // Only get customers (users with role 'customer')
         $customers = User::where('role', 'customer')->orderBy('name')->get();
         $vehicle->load('customer');
@@ -119,6 +166,13 @@ class VehicleController extends Controller
      */
     public function update(Request $request, Vehicle $vehicle)
     {
+        $user = Auth::user();
+        
+        // Customer tidak boleh update kendaraan
+        if ($user->role === 'customer') {
+            abort(403, 'Anda tidak memiliki akses untuk mengupdate kendaraan.');
+        }
+        
         $validator = Validator::make($request->all(), [
             'customer_id' => 'required|exists:users,id',
             'type' => 'required|in:motorcycle,electric_bike',
@@ -170,6 +224,13 @@ class VehicleController extends Controller
      */
     public function destroy(Vehicle $vehicle)
     {
+        $user = Auth::user();
+        
+        // Customer tidak boleh hapus kendaraan
+        if ($user->role === 'customer') {
+            abort(403, 'Anda tidak memiliki akses untuk menghapus kendaraan.');
+        }
+        
         // Check if vehicle has related appointments or work orders
         if ($vehicle->appointments()->exists() || $vehicle->workOrders()->exists()) {
             return redirect()->route('vehicles.index')
@@ -191,12 +252,13 @@ class VehicleController extends Controller
     public function search(Request $request)
     {
         $query = $request->get('q');
+        $user = Auth::user();
         
         if (empty($query)) {
             return redirect()->route('vehicles.index');
         }
 
-        $vehicles = Vehicle::with('customer')
+        $vehicleQuery = Vehicle::with('customer')
             ->where(function ($q) use ($query) {
                 $q->where('license_plate', 'like', "%{$query}%")
                   ->orWhere('brand', 'like', "%{$query}%")
@@ -205,8 +267,14 @@ class VehicleController extends Controller
                       $subQuery->where('name', 'like', "%{$query}%")
                                ->orWhere('phone', 'like', "%{$query}%");
                   });
-            })
-            ->latest()
+            });
+            
+        // Jika customer, filter hanya kendaraan milik mereka
+        if ($user->role === 'customer') {
+            $vehicleQuery->where('customer_id', $user->id);
+        }
+            
+        $vehicles = $vehicleQuery->latest()
             ->paginate(10)
             ->appends(['q' => $query]);
 
@@ -222,9 +290,15 @@ class VehicleController extends Controller
     public function getByCustomer(Request $request)
     {
         $customerId = $request->get('customer_id');
+        $user = Auth::user();
         
         if (!$customerId) {
             return response()->json(['vehicles' => []]);
+        }
+        
+        // Jika customer, pastikan mereka hanya bisa mengakses kendaraan milik mereka
+        if ($user->role === 'customer' && $customerId != $user->id) {
+            return response()->json(['error' => 'Akses ditolak'], 403);
         }
 
         $vehicles = Vehicle::where('customer_id', $customerId)
@@ -242,6 +316,13 @@ class VehicleController extends Controller
      */
     public function getDetails(Vehicle $vehicle)
     {
+        $user = Auth::user();
+        
+        // Jika customer, pastikan mereka hanya bisa mengakses kendaraan milik mereka
+        if ($user->role === 'customer' && $vehicle->customer_id !== $user->id) {
+            return response()->json(['error' => 'Akses ditolak'], 403);
+        }
+        
         $vehicle->load('customer');
         
         return response()->json([

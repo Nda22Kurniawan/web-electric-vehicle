@@ -16,6 +16,7 @@ use App\Http\Controllers\WorkOrderController;
 use App\Http\Controllers\WorkOrderPartController;
 use App\Http\Controllers\WorkOrderServiceController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\DashboardController; // TAMBAHAN: Import DashboardController
 
 /*
 |--------------------------------------------------------------------------
@@ -43,11 +44,20 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 // Protected Dashboard Routes
 Route::middleware('auth')->group(function () {
+    // PERBAIKAN: Unified Dashboard Route menggunakan DashboardController
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    
+    // Dashboard API routes untuk AJAX/dynamic updates
+    Route::get('/dashboard/stats', [DashboardController::class, 'getStats'])->name('dashboard.stats');
+    Route::get('/dashboard/widgets', [DashboardController::class, 'getWidgets'])->name('dashboard.widgets');
+    Route::get('/dashboard/activities', [DashboardController::class, 'getRecentActivities'])->name('dashboard.activities');
+    Route::get('/dashboard/service-stats', [DashboardController::class, 'getServiceStats'])->name('dashboard.service-stats');
+    Route::get('/dashboard/popular-services', [DashboardController::class, 'getPopularServices'])->name('dashboard.popular-services');
+
     // Admin routes
     Route::middleware('can:admin')->group(function () {
-        Route::get('/admin/dashboard', function () {
-            return view('admin.dashboard');
-        })->name('admin.dashboard');
+        // Admin dashboard tetap ada jika diperlukan untuk view khusus admin
+        Route::get('/admin/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
 
         // User management routes (admin only)
         Route::resource('users', UserController::class);
@@ -58,22 +68,12 @@ Route::middleware('auth')->group(function () {
         // Route khusus untuk parts - harus sebelum resource
         Route::get('/parts/low-stock', [PartController::class, 'lowStock'])->name('parts.low-stock');
         Route::resource('parts', PartController::class);
-
-        Route::resource('inventory-transactions', InventoryTransactionController::class);
-        Route::get('/inventory-transactions/report', [InventoryTransactionController::class, 'report'])->name('inventory-transactions.report');
-        Route::get('/inventory-transactions/movement', [InventoryTransactionController::class, 'movementReport'])->name('inventory-transactions.movement');
-
-        // Route::resource('work-orders', WorkOrderController::class);
-        // Route::get('/work-orders/invoice', [WorkOrderController::class, 'invoice'])->name('work-orders.invoice');
-        // Route::get('/work-orders/receipt', [WorkOrderController::class, 'receipt'])->name('work-orders.receipt');
-        // Route::get('/work-orders/show', [WorkOrderController::class, 'show'])->name('work-orders.show');
     });
 
     // Mechanic routes
     Route::middleware('can:mechanic')->group(function () {
-        Route::get('/mechanic/dashboard', function () {
-            return view('mechanic.dashboard');
-        })->name('mechanic.dashboard');
+        // Mechanic dashboard menggunakan DashboardController yang sama
+        Route::get('/mechanic/dashboard', [DashboardController::class, 'index'])->name('mechanic.dashboard');
 
         // Mechanic specific routes
         Route::resource('work-order-parts', WorkOrderPartController::class);
@@ -83,7 +83,8 @@ Route::middleware('auth')->group(function () {
 
     // Customer routes
     Route::middleware('can:customer')->group(function () {
-        Route::get('/customer/dashboard', [CustomerController::class, 'dashboard'])->name('customer.dashboard');
+        // PERBAIKAN: Customer dashboard menggunakan DashboardController
+        Route::get('/customer/dashboard', [DashboardController::class, 'index'])->name('customer.dashboard');
 
         // Customer specific routes
         Route::get('/customer/bookings', [CustomerController::class, 'bookings'])->name('customer.bookings');
@@ -102,13 +103,13 @@ Route::middleware('auth')->group(function () {
     });
 
     // Common routes for all authenticated users
-    // Appointments with custom routes - TAMBAHAN ROUTE BARU
+    // Appointments with custom routes
     Route::get('/appointments/customer-details', [AppointmentController::class, 'getCustomerDetails'])
         ->name('appointments.get-customer-details');
     Route::get('/appointments/today', [AppointmentController::class, 'today'])->name('appointments.today');
     Route::get('/appointments/track', [AppointmentController::class, 'track'])->name('appointments.track');
     Route::post('/appointments/track', [AppointmentController::class, 'track'])->name('appointments.track');
-    Route::put('appointments/{appointment}/status', [AppointmentController::class, 'updateStatus'])
+    Route::post('/appointments/{appointment}/status', [AppointmentController::class, 'updateStatus'])
         ->name('appointments.update-status');
     Route::resource('appointments', AppointmentController::class);
 
@@ -132,13 +133,15 @@ Route::middleware('auth')->group(function () {
     Route::get('/work-orders/{workOrder}/create-payment', [WorkOrderController::class, 'createPayment'])->name('work-orders.create-payment');
     Route::get('/work-orders/{workOrder}/payment', [WorkOrderController::class, 'createPayment'])->name('work-orders.create-payment');
     Route::post('/work-orders/{workOrder}/payment', [WorkOrderController::class, 'storePayment'])->name('work-orders.store-payment');
-    Route::get('/work-orders/show', [WorkOrderController::class, 'show'])->name('work-orders.show');
 
-    // Vehicle routes with custom route - TAMBAHAN ROUTE BARU
+    // Vehicle routes with custom route
     Route::get('/vehicles/by-customer', [VehicleController::class, 'getByCustomer'])->name('vehicles.getByCustomer');
-    Route::get('/vehicles/by-customer', [VehicleController::class, 'getByCustomer'])
-        ->name('vehicles.getByCustomer');
     Route::resource('vehicles', VehicleController::class);
+
+    // Inventory Transaction routes - custom routes HARUS sebelum resource routes
+    Route::get('/inventory-transactions/report', [InventoryTransactionController::class, 'report'])->name('inventory_transactions.report');
+    Route::get('/inventory-transactions/movement', [InventoryTransactionController::class, 'movementReport'])->name('inventory_transactions.movement');
+    Route::resource('inventory-transactions', InventoryTransactionController::class);
 
     // Profile route
     Route::get('/profile', function () {
@@ -154,15 +157,4 @@ Route::middleware('auth')->group(function () {
     Route::get('/notifications', function () {
         return view('notifications.index');
     })->name('notifications.index');
-
-    // Redirect based on role
-    Route::get('/dashboard', function () {
-        if (auth()->user()->isAdmin()) {
-            return redirect()->route('admin.dashboard');
-        } elseif (auth()->user()->isMechanic()) {
-            return redirect()->route('mechanic.dashboard');
-        } else {
-            return redirect()->route('customer.dashboard');
-        }
-    })->name('dashboard');
 });

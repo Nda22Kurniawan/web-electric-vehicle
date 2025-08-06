@@ -8,6 +8,7 @@ use App\Models\ServiceSchedule;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 
 class AppointmentController extends Controller
@@ -19,7 +20,13 @@ class AppointmentController extends Controller
      */
     public function index(Request $request)
     {
+        $user = Auth::user();
         $query = Appointment::with(['vehicle', 'customer']);
+
+        // Jika customer, hanya tampilkan appointment milik mereka
+        if ($user->role === 'customer') {
+            $query->where('customer_id', $user->id);
+        }
 
         // Apply filters
         if ($request->filled('status')) {
@@ -44,25 +51,32 @@ class AppointmentController extends Controller
 
         $appointments = $query->latest()->paginate(15);
 
-        // Get statistics
+        // Get statistics - filter berdasarkan role
         $today = Carbon::today();
         $thisMonth = Carbon::now()->startOfMonth();
 
-        $today_count = Appointment::whereDate('appointment_date', $today)
+        $statsQuery = Appointment::query();
+        if ($user->role === 'customer') {
+            $statsQuery->where('customer_id', $user->id);
+        }
+
+        $today_count = (clone $statsQuery)->whereDate('appointment_date', $today)
             ->whereIn('status', ['pending', 'confirmed', 'in_progress'])
             ->count();
 
-        $pending_count = Appointment::where('status', 'pending')->count();
-        $in_progress_count = Appointment::where('status', 'in_progress')->count();
-        $completed_count = Appointment::where('status', 'completed')
+        $pending_count = (clone $statsQuery)->where('status', 'pending')->count();
+        $in_progress_count = (clone $statsQuery)->where('status', 'in_progress')->count();
+        $completed_count = (clone $statsQuery)->where('status', 'completed')
             ->where('created_at', '>=', $thisMonth)
             ->count();
 
         // Get recent appointments for the dashboard section
-        $recent_appointments = Appointment::with(['vehicle', 'customer'])
-            ->latest()
-            ->limit(10)
-            ->get();
+        $recentQuery = Appointment::with(['vehicle', 'customer']);
+        if ($user->role === 'customer') {
+            $recentQuery->where('customer_id', $user->id);
+        }
+        
+        $recent_appointments = $recentQuery->latest()->limit(10)->get();
 
         return view('appointments.index', compact(
             'appointments',
@@ -80,20 +94,24 @@ class AppointmentController extends Controller
      * @return \Illuminate\Http\Response
      */
     public function create()
-{
-    // Get all customers (users with role 'customer')
-    $customers = User::where('role', 'customer')
-        ->orderBy('name')
-        ->get();
-    
-    // Get all schedules
-    $schedules = ServiceSchedule::orderBy('day_of_week')->get();
+    {
+        $user = Auth::user();
+        
+        // Jika customer, otomatis pilih dirinya sendiri
+        if ($user->role === 'customer') {
+            $customers = collect([$user]); // Hanya dirinya sendiri
+            $vehicles = $user->vehicles; // Hanya kendaraan milik customer
+        } else {
+            // Get all customers (users with role 'customer')
+            $customers = User::where('role', 'customer')->orderBy('name')->get();
+            $vehicles = Vehicle::all(); // Semua kendaraan untuk admin/owner
+        }
+        
+        // Get all schedules
+        $schedules = ServiceSchedule::orderBy('day_of_week')->get();
 
-    // Get all vehicles
-    $vehicles = Vehicle::all(); // <-- Tambahkan baris ini
-
-    return view('appointments.create', compact('customers', 'schedules', 'vehicles'));
-}
+        return view('appointments.create', compact('customers', 'schedules', 'vehicles'));
+    }
 
     /**
      * Store a newly created appointment in storage.
@@ -103,6 +121,13 @@ class AppointmentController extends Controller
      */
     public function store(Request $request)
     {
+        $user = Auth::user();
+        
+        // Jika customer, paksa customer_id ke ID mereka sendiri
+        if ($user->role === 'customer') {
+            $request->merge(['customer_id' => $user->id]);
+        }
+
         $validationRules = [
             'customer_id' => 'required|exists:users,id',
             'vehicle_id' => 'required|exists:vehicles,id',
@@ -115,11 +140,21 @@ class AppointmentController extends Controller
         $validator = Validator::make($request->all(), $validationRules);
 
         // Additional validation to ensure vehicle belongs to customer
-        $validator->after(function ($validator) use ($request) {
+        $validator->after(function ($validator) use ($request, $user) {
             if ($request->customer_id && $request->vehicle_id) {
                 $vehicle = Vehicle::find($request->vehicle_id);
                 if ($vehicle && $vehicle->customer_id != $request->customer_id) {
                     $validator->errors()->add('vehicle_id', 'Kendaraan yang dipilih tidak milik customer tersebut.');
+                }
+                
+                // Jika user adalah customer, pastikan mereka hanya bisa membuat appointment untuk diri sendiri
+                if ($user->role === 'customer' && $request->customer_id != $user->id) {
+                    $validator->errors()->add('customer_id', 'Anda hanya dapat membuat appointment untuk diri sendiri.');
+                }
+                
+                // Jika customer, pastikan vehicle juga milik mereka
+                if ($user->role === 'customer' && $vehicle && $vehicle->customer_id != $user->id) {
+                    $validator->errors()->add('vehicle_id', 'Anda hanya dapat memilih kendaraan milik Anda sendiri.');
                 }
             }
         });
@@ -186,10 +221,16 @@ class AppointmentController extends Controller
      */
     public function getCustomerDetails(Request $request)
     {
+        $user = Auth::user();
         $customerId = $request->get('customer_id');
         
         if (!$customerId) {
             return response()->json(['success' => false]);
+        }
+        
+        // Jika customer, pastikan mereka hanya bisa akses data diri sendiri
+        if ($user->role === 'customer' && $customerId != $user->id) {
+            return response()->json(['success' => false, 'error' => 'Akses ditolak']);
         }
 
         $customer = User::with('vehicles')->find($customerId);
@@ -222,6 +263,13 @@ class AppointmentController extends Controller
      */
     public function show(Appointment $appointment)
     {
+        $user = Auth::user();
+        
+        // Jika customer, pastikan mereka hanya bisa melihat appointment milik mereka
+        if ($user->role === 'customer' && $appointment->customer_id !== $user->id) {
+            abort(403, 'Anda tidak memiliki akses ke appointment ini.');
+        }
+        
         $appointment->load(['vehicle', 'customer']);
         return view('appointments.show', compact('appointment'));
     }
@@ -234,6 +282,13 @@ class AppointmentController extends Controller
      */
     public function edit(Appointment $appointment)
     {
+        $user = Auth::user();
+        
+        // Customer tidak boleh edit appointment (hanya admin/owner)
+        if ($user->role === 'customer') {
+            abort(403, 'Anda tidak memiliki akses untuk mengedit appointment.');
+        }
+        
         $customers = User::where('role', 'customer')->orderBy('name')->get();
         $schedules = ServiceSchedule::orderBy('day_of_week')->get();
 
@@ -251,6 +306,13 @@ class AppointmentController extends Controller
      */
     public function update(Request $request, Appointment $appointment)
     {
+        $user = Auth::user();
+        
+        // Customer tidak boleh update appointment
+        if ($user->role === 'customer') {
+            abort(403, 'Anda tidak memiliki akses untuk mengupdate appointment.');
+        }
+        
         // Check if this is just a status update (quick action)
         if ($request->has('status') && count($request->all()) <= 3) { // status, _token, _method
             $validator = Validator::make($request->all(), [
@@ -381,6 +443,13 @@ class AppointmentController extends Controller
      */
     public function updateStatus(Request $request, Appointment $appointment)
     {
+        $user = Auth::user();
+        
+        // Customer tidak boleh update status
+        if ($user->role === 'customer') {
+            abort(403, 'Anda tidak memiliki akses untuk mengupdate status appointment.');
+        }
+        
         $validator = Validator::make($request->all(), [
             'status' => 'required|in:pending,confirmed,in_progress,completed,cancelled',
             'notes' => 'nullable|string',
@@ -422,6 +491,13 @@ class AppointmentController extends Controller
      */
     public function destroy(Appointment $appointment)
     {
+        $user = Auth::user();
+        
+        // Customer tidak boleh hapus appointment
+        if ($user->role === 'customer') {
+            abort(403, 'Anda tidak memiliki akses untuk menghapus appointment.');
+        }
+        
         $appointment->delete();
 
         return redirect()->route('appointments.index')
@@ -435,10 +511,15 @@ class AppointmentController extends Controller
      */
     public function today()
     {
-        $appointments = Appointment::with(['vehicle', 'customer'])
-            ->today()
-            ->latest()
-            ->get();
+        $user = Auth::user();
+        $query = Appointment::with(['vehicle', 'customer'])->today();
+        
+        // Jika customer, hanya tampilkan appointment hari ini milik mereka
+        if ($user->role === 'customer') {
+            $query->where('customer_id', $user->id);
+        }
+        
+        $appointments = $query->latest()->get();
 
         return view('appointments.today', compact('appointments'));
     }
@@ -462,13 +543,24 @@ class AppointmentController extends Controller
                     ->withInput();
             }
 
-            $appointment = Appointment::with(['vehicle', 'customer'])
-                ->where('tracking_code', $request->tracking_code)
-                ->first();
+            $user = Auth::user();
+            $appointmentQuery = Appointment::with(['vehicle', 'customer'])
+                ->where('tracking_code', $request->tracking_code);
+                
+            // Jika customer, pastikan tracking code adalah milik mereka
+            if ($user && $user->role === 'customer') {
+                $appointmentQuery->where('customer_id', $user->id);
+            }
+            
+            $appointment = $appointmentQuery->first();
 
             if (!$appointment) {
+                $errorMessage = ($user && $user->role === 'customer') 
+                    ? 'Kode pelacakan tidak valid atau bukan milik Anda.' 
+                    : 'Kode pelacakan tidak valid.';
+                    
                 return redirect()->back()
-                    ->withErrors(['tracking_code' => 'Kode pelacakan tidak valid.'])
+                    ->withErrors(['tracking_code' => $errorMessage])
                     ->withInput();
             }
 
