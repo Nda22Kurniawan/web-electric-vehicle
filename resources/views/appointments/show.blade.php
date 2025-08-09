@@ -172,6 +172,13 @@
                                 @endif
                             @endif
                             
+                            {{-- Button Buat Work Order - Hanya muncul jika status completed dan user bukan customer --}}
+                            @if($appointment->status == 'completed' && auth()->user()->role !== 'customer')
+                                <a href="{{ route('work-orders.create', ['appointment_id' => $appointment->id]) }}" class="btn btn-primary me-2">
+                                    <i class="fas fa-cogs me-1"></i> Buat Work Order
+                                </a>
+                            @endif
+                            
                             @if(auth()->user()->can('print appointments'))
                             <a href="{{ route('appointments.print', $appointment->id) }}" class="btn btn-info" target="_blank">
                                 <i class="fas fa-print me-1"></i> Cetak
@@ -281,6 +288,13 @@
                                 <i class="fas fa-check-double me-1"></i> Selesaikan Servis
                             </button>
                         </form>
+                        @endif
+                        
+                        {{-- Button Buat Work Order di Aksi Cepat juga --}}
+                        @if($appointment->status == 'completed')
+                        <a href="{{ route('work-orders.create', ['appointment_id' => $appointment->id]) }}" class="btn btn-primary w-100 mb-2">
+                            <i class="fas fa-cogs me-1"></i> Buat Work Order
+                        </a>
                         @endif
                         
                         @if($appointment->status != 'completed' && $appointment->status != 'cancelled')
